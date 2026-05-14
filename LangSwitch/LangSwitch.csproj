@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>LangSwitch</AssemblyName>
+    <RootNamespace>LangSwitch</RootNamespace>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Copy flag PNGs from sibling project if present, otherwise use local Assets -->
+    <Content Include="..\..\..\Project\LanguageSwitcher\LanguageSwitcher\Assets\Flags\*.png"
+             Condition="Exists('..\..\..\Project\LanguageSwitcher\LanguageSwitcher\Assets\Flags')">
+      <Link>Assets\Flags\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Flags\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
