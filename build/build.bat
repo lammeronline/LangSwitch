@@ -4,6 +4,9 @@ setlocal
 set SLN=%~dp0..\LangSwitch.sln
 set OUT=%~dp0out
 
+echo Stopping running instance...
+taskkill /f /im LangSwitch.exe >nul 2>&1
+
 echo Building LangSwitch...
 dotnet publish "%SLN%" -c Release -r win-x64 --self-contained false -o "%OUT%"
 

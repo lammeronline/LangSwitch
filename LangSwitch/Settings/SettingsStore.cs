@@ -4,9 +4,7 @@ namespace LangSwitch.Settings;
 
 static class SettingsStore
 {
-    static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "LangSwitch", "settings.json");
+    static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "settings.json");
 
     static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -28,7 +26,6 @@ static class SettingsStore
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOptions));
         }
         catch { }
