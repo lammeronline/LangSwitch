@@ -100,7 +100,7 @@ sealed class TrayApplicationContext : ApplicationContext
         {
             try
             {
-                if (await TryConvertSelectionAsync(buf)) return;
+                if (await TryConvertSelectionAsync(buf, lastWord)) return;
                 await TryConvertWordAsync(buf, lastWord, lastBound);
             }
             catch (Exception ex)
@@ -112,6 +112,9 @@ sealed class TrayApplicationContext : ApplicationContext
     }
 
     // ── Clipboard helpers (retry on CLIPBRD_E_CANT_OPEN) ─────────────────
+    [DllImport("user32.dll")]
+    static extern uint GetClipboardSequenceNumber();
+
     static async Task<string?> ClipGetAsync()
     {
         for (int i = 0; i < 5; i++)
@@ -136,31 +139,52 @@ sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    // ── Selected text path ────────────────────────────────────────────────
-    // trackerBuf — текущее слово трекера; если буфер совпадает с тем, что
-    // скопировал Ctrl+C, значит приложение сделало «copy current line» без
-    // выделения (поведение нового Notepad), и надо переключиться на word-путь.
-    async Task<bool> TryConvertSelectionAsync(string trackerBuf)
+    /// <summary>
+    /// Sets the clipboard and confirms the write actually stuck before returning — a plain
+    /// ClipSetAsync can silently no-op under clipboard contention (e.g. Windows' clipboard
+    /// history service), leaving a stale value in place for the Ctrl+V that follows.
+    /// </summary>
+    static async Task<bool> ClipSetAndVerifyAsync(string text)
     {
-        const string sentinel = "__LS_NOSEL__";
-        string? prevClip = await ClipGetAsync();
+        for (int i = 0; i < 8; i++)
+        {
+            await ClipSetAsync(text);
+            if (await ClipGetAsync() == text) return true;
+            await Task.Delay(15);
+        }
+        return false;
+    }
 
-        await ClipSetAsync(sentinel);
+    // ── Selected text path ────────────────────────────────────────────────
+    // trackerBuf/lastWord — текущее или последнее завершённое слово трекера;
+    // если скопированный текст совпадает с любым из них, значит приложение
+    // сделало «copy current line» без выделения (поведение нового
+    // Notepad/Notepad++), и надо переключиться на word-путь, а не вставлять
+    // результат поверх несуществующего выделения.
+    async Task<bool> TryConvertSelectionAsync(string trackerBuf, string lastWord)
+    {
+        string? prevClip = await ClipGetAsync();
+        uint seqBefore = GetClipboardSequenceNumber();
+
         TextInjector.SendChord(0x11, 0x43); // Ctrl+C
         await Task.Delay(80);
 
-        var clipped = await ClipGetAsync();
-        if (clipped == null || clipped == sentinel)
-        {
-            await ClipSetAsync(prevClip);
+        // The clipboard sequence number only changes when something actually overwrites
+        // the clipboard. If it's unchanged, Ctrl+C genuinely did nothing — there is no
+        // selection — regardless of whatever happens to already be on the clipboard
+        // (avoids misreading stale clipboard content as a fresh copy).
+        if (GetClipboardSequenceNumber() == seqBefore)
             return false;
-        }
 
-        var text = clipped.Trim('\r', '\n');
+        var clipped = await ClipGetAsync();
+        // Full Trim() (not just \r\n) — some editors' "copy current line, no selection"
+        // behavior (e.g. Notepad++) includes a trailing space/newline that a plain
+        // Trim('\r','\n') wouldn't strip, breaking the line-copy-vs-real-selection check below.
+        var text = clipped?.Trim();
 
-        // Если скопированный текст совпадает с текущим словом трекера —
-        // это line-copy без реального выделения, а не выделение пользователя.
-        if (string.IsNullOrEmpty(text) || text == trackerBuf)
+        // Если скопированный текст совпадает с текущим или последним завершённым
+        // словом — это line-copy без реального выделения, а не выделение пользователя.
+        if (string.IsNullOrEmpty(text) || text == trackerBuf || text == lastWord)
         {
             await ClipSetAsync(prevClip);
             return false;
@@ -174,7 +198,12 @@ sealed class TrayApplicationContext : ApplicationContext
             return true;
         }
 
-        await ClipSetAsync(converted);
+        if (!await ClipSetAndVerifyAsync(converted))
+        {
+            await ClipSetAsync(prevClip);
+            Balloon("Clipboard busy — try again");
+            return true;
+        }
         await Task.Delay(_settings.ClipboardDelayMs);
         TextInjector.SendChord(0x11, 0x56); // Ctrl+V
 
@@ -215,10 +244,17 @@ sealed class TrayApplicationContext : ApplicationContext
     {
         string? prevClip = await ClipGetAsync();
 
+        // Prime the clipboard with the replacement *before* deleting anything, so a clipboard
+        // write failure never leaves the word erased with nothing to paste back in its place.
+        if (!await ClipSetAndVerifyAsync(insert))
+        {
+            Balloon("Clipboard busy — try again");
+            return;
+        }
+
         TextInjector.SendBackspaces(deleteCount);
         await Task.Delay(30);
 
-        await ClipSetAsync(insert);
         await Task.Delay(_settings.ClipboardDelayMs);
         TextInjector.SendChord(0x11, 0x56); // Ctrl+V
         await Task.Delay(50);
