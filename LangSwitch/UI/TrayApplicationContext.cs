@@ -282,6 +282,7 @@ sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add("Settings…", null, (_, _) => OpenSettings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Quit());
+        menu.Opening += (_, _) => MenuTheme.Apply(menu);
         return menu;
     }
 
@@ -328,6 +329,7 @@ sealed class TrayApplicationContext : ApplicationContext
             menu.Items.Add(item);
         }
 
+        MenuTheme.Apply(menu);
         menu.Show(Cursor.Position);
     }
 

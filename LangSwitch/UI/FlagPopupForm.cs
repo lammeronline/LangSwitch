@@ -23,8 +23,14 @@ sealed class FlagPopupForm : Form
     const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     const int DWMWA_BORDER_COLOR             = 34;
     const int DWMWCP_ROUND                   = 2;
-    // COLORREF is 0x00BBGGRR — a muted dark-gray border
-    const int BorderColorRef                 = 0x00505050;
+    // COLORREF is 0x00BBGGRR
+    const int DarkBorderColorRef  = 0x00505050; // muted dark-gray border
+    const int LightBorderColorRef = 0x00D4D4D4; // light-gray border
+
+    static readonly Color DarkBack  = Color.FromArgb(24, 26, 32);
+    static readonly Color DarkText  = Color.FromArgb(220, 220, 220);
+    static readonly Color LightBack = Color.FromArgb(250, 250, 250);
+    static readonly Color LightText = Color.FromArgb(30, 30, 30);
 
     // ── Layout constants ──────────────────────────────────────────────────────
     const int FormWidth   = 180;
@@ -46,7 +52,6 @@ sealed class FlagPopupForm : Form
         ShowInTaskbar   = false;
         StartPosition   = FormStartPosition.Manual;
         TopMost         = true;
-        BackColor       = Color.FromArgb(24, 26, 32);
         Opacity         = 0.80;
 
         _flagBox = new PictureBox
@@ -63,7 +68,6 @@ sealed class FlagPopupForm : Form
             Height    = LabelHeight,
             TextAlign = ContentAlignment.MiddleCenter,
             Font      = new Font("Segoe UI", 12, FontStyle.Bold),
-            ForeColor = Color.FromArgb(220, 220, 220),
             BackColor = Color.Transparent,
         };
 
@@ -81,8 +85,20 @@ sealed class FlagPopupForm : Form
         int corner = DWMWCP_ROUND;
         DwmSetWindowAttribute(Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
 
-        int border = BorderColorRef;
-        DwmSetWindowAttribute(Handle, DWMWA_BORDER_COLOR, ref border, sizeof(int));
+        ApplyTheme();
+    }
+
+    void ApplyTheme()
+    {
+        bool dark = SystemTheme.IsDark();
+        BackColor      = dark ? DarkBack : LightBack;
+        _label.ForeColor = dark ? DarkText : LightText;
+
+        if (IsHandleCreated)
+        {
+            int border = dark ? DarkBorderColorRef : LightBorderColorRef;
+            DwmSetWindowAttribute(Handle, DWMWA_BORDER_COLOR, ref border, sizeof(int));
+        }
     }
 
     protected override CreateParams CreateParams
@@ -103,6 +119,7 @@ sealed class FlagPopupForm : Form
     public void ShowLayout(LayoutInfo layout)
     {
         _hideTimer.Stop();
+        ApplyTheme();
         ApplySize();
         SetFlag(layout);
         _label.Text = layout.ShortCode;
