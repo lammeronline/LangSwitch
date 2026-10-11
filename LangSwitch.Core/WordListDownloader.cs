@@ -2,7 +2,16 @@ namespace LangSwitch.Core;
 
 public static class WordListDownloader
 {
-    static readonly HttpClient Http = new();
+    // ConnectTimeout fails fast (8s) when the host is unreachable or blocked — e.g. offline,
+    // or a flaky/filtered connection that never completes a handshake — so a stuck download
+    // falls back to the next source (or gives up) promptly instead of hanging for however
+    // long HttpClient's default Timeout (100s) would otherwise allow. The overall Timeout is
+    // kept generous (dictionaries run several MB — uk.dic alone is ~8.5MB) so a connection
+    // that's merely slow, not dead, still gets to finish instead of being cut off mid-transfer.
+    static readonly HttpClient Http = new(new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(8) })
+    {
+        Timeout = TimeSpan.FromMinutes(5),
+    };
 
     // wooorm/dictionaries packages Hunspell dictionaries (stem list + affix rules) — recognizes
     // inflected forms (declensions, conjugations) a flat list would miss. But it only covers
@@ -58,9 +67,12 @@ public static class WordListDownloader
 
             return LanguageDictionaries.ReadStemCount(dicBytes);
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            // No Hunspell dictionary for this language — fall back to a flat frequency list.
+            // No Hunspell dictionary for this language (404), or the source timed out/was
+            // unreachable (TaskCanceledException — what a connect/overall timeout actually
+            // throws, not HttpRequestException) — either way, fall back to a flat frequency
+            // list rather than surfacing the failure directly.
             progress?.Report($"No Hunspell dictionary for {lang.ToUpperInvariant()}, trying word-frequency list…");
             return await DownloadFrequencyListAsync(lang, HermitdaveUrlFor(lang), progress);
         }
