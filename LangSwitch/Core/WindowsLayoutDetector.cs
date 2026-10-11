@@ -6,9 +6,6 @@ namespace LangSwitch.Core;
 static class WindowsLayoutDetector
 {
     [DllImport("user32.dll")]
-    static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll")]
     static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
     [DllImport("user32.dll")]
@@ -16,7 +13,7 @@ static class WindowsLayoutDetector
 
     public static LayoutInfo? GetForegroundLayout()
     {
-        IntPtr hwnd = GetForegroundWindow();
+        IntPtr hwnd = LayoutManager.CurrentForegroundWindow;
         if (hwnd == IntPtr.Zero) return null;
 
         uint threadId = GetWindowThreadProcessId(hwnd, out _);
@@ -47,7 +44,7 @@ static class WindowsLayoutDetector
     /// <summary>Process name (no extension) of the app currently in the foreground, or null.</summary>
     public static string? GetForegroundProcessName()
     {
-        var hwnd = GetForegroundWindow();
+        var hwnd = LayoutManager.CurrentForegroundWindow;
         if (hwnd == IntPtr.Zero) return null;
 
         GetWindowThreadProcessId(hwnd, out uint pid);

@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace LangSwitch.Core;
 
 /// <summary>
@@ -10,37 +8,15 @@ namespace LangSwitch.Core;
 /// </summary>
 public static class UndoLearningStore
 {
-    static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "word-exceptions.json");
-
-    static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    const string FileName = "word-exceptions.json";
 
     public static Dictionary<string, int> Load()
     {
-        try
-        {
-            if (!File.Exists(FilePath)) return new(StringComparer.OrdinalIgnoreCase);
-            var json = File.ReadAllText(FilePath);
-            var dict = JsonSerializer.Deserialize<Dictionary<string, int>>(json, JsonOptions);
-            return dict is null
-                ? new(StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, int>(dict, StringComparer.OrdinalIgnoreCase);
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error(ex);
-            return new(StringComparer.OrdinalIgnoreCase);
-        }
+        var loaded = JsonFileStore.Load<Dictionary<string, int>?>(FileName, () => null);
+        return loaded is null
+            ? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, int>(loaded, StringComparer.OrdinalIgnoreCase);
     }
 
-    public static void Save(Dictionary<string, int> counts)
-    {
-        try
-        {
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(counts, JsonOptions));
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error(ex);
-        }
-    }
+    public static void Save(Dictionary<string, int> counts) => JsonFileStore.Save(FileName, counts);
 }

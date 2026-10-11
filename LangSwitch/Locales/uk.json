@@ -58,6 +58,9 @@
   "Exclusions.Hint": "LangSwitch не виправлятиме та не сповіщатиме, поки активні ці застосунки\n(ім'я процесу, напр. cmd.exe):",
   "Exclusions.Placeholder": "напр. notepad.exe",
   "Exclusions.PickRunningApp": "Обрати запущений застосунок…",
+  "Exclusions.BrowseExe": "Огляд…",
+  "Exclusions.BrowseDialogTitle": "Виберіть застосунок",
+  "Exclusions.BrowseFilter": "Застосунки (*.exe)|*.exe|Усі файли (*.*)|*.*",
 
   "Abbreviations.Hint": "Введіть слово-тригер — воно розгорнеться, щойно ви його допишете:",
   "Abbreviations.Trigger": "Тригер:",
@@ -116,5 +119,7 @@
   "Balloon.PressToFix": " (натисніть {0}, щоб виправити)",
   "Balloon.ErrorPrefix": "Помилка: {0}",
 
-  "AppPicker.Title": "Вибір запущеного застосунку"
+  "AppPicker.Title": "Вибір запущеного застосунку",
+  "AppPicker.ColumnTitle": "Вікно",
+  "AppPicker.ColumnProcess": "Процес"
 }

@@ -10,6 +10,11 @@ static class AppIcon
 {
     public static readonly Icon? Shared = TryLoad();
 
+    public static void ApplyTo(Form form)
+    {
+        if (Shared is not null) form.Icon = Shared;
+    }
+
     static Icon? TryLoad()
     {
         try { return Icon.ExtractAssociatedIcon(Application.ExecutablePath); }

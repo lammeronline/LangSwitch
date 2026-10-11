@@ -1,5 +1,6 @@
 using LangSwitch.Core;
 using LangSwitch.Settings;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http;
 using static LangSwitch.Core.Localization;
 
@@ -13,6 +14,8 @@ sealed class SettingsForm : Form
     readonly LanguageDictionaries _langDicts;
     readonly Stats _stats;
     readonly Dictionary<string, int> _undoCounts;
+
+    int LearnedWordCount => _undoCounts.Count(kv => kv.Value >= _settings.UndoLearnThreshold);
     readonly Action _resetUndoLearning;
 
     // ── Sidebar nav ─────────────────────────────────────────────────────────
@@ -56,19 +59,19 @@ sealed class SettingsForm : Form
 
     // ── Abbreviations section ────────────────────────────────────────────────
     CheckedListBox _abbrevListBox  = null!;
+    CheckedListEditor<Abbreviation> _abbrevEditor = null!;
     TextBox        _abbrevTriggerBox   = null!;
     TextBox        _abbrevExpansionBox = null!;
-    bool           _suppressAbbrev;
 
     // ── Dictionaries section ─────────────────────────────────────────────────
     CheckedListBox _dictListBox  = null!;
+    CheckedListEditor<UserDictionary> _dictEditor = null!;
     TextBox        _dictNameBox  = null!;
     TextBox        _dictLangBox  = null!;
     TextBox        _dictUrlBox   = null!;
     Label          _dictStatus   = null!;
     Button         _dictDlBtn    = null!;
     Button         _dictImportBtn = null!;
-    bool           _suppressDict;
 
     public SettingsForm(AppSettings settings, List<UserDictionary> dicts, LanguageDictionaries langDicts,
         List<Abbreviation> abbreviations, Stats stats, Dictionary<string, int> undoCounts, Action resetUndoLearning)
@@ -95,13 +98,16 @@ sealed class SettingsForm : Form
     void Build()
     {
         Text            = T("Settings.Title");
-        Size            = new Size(580, 520);
+        // Wide enough for the Exclusions row (textbox + Pick + Browse + Add/Remove column)
+        // at full localized button widths without crowding — narrower dialogs are what kept
+        // forcing buttons to compete for space across several of these sections.
+        Size            = new Size(680, 520);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox     = false;
         MinimizeBox     = false;
         StartPosition   = FormStartPosition.CenterScreen;
         Font            = new Font("Segoe UI", 9f);
-        if (AppIcon.Shared is not null) Icon = AppIcon.Shared;
+        AppIcon.ApplyTo(this);
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -214,7 +220,9 @@ sealed class SettingsForm : Form
 
     Panel BuildButtonBar()
     {
-        var bar = new Panel { Dock = DockStyle.Bottom, Height = 46, Padding = new Padding(0, 9, 12, 0) };
+        // Right padding matches BuildContent's Panel (16px) so the OK/Cancel row's right edge
+        // lines up with the content above it instead of sitting a few pixels further left.
+        var bar = new Panel { Dock = DockStyle.Bottom, Height = 46, Padding = new Padding(0, 9, 16, 0) };
         var btnOk     = new Button { Text = T("Common.OK"),     DialogResult = DialogResult.OK,     Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         var btnCancel = new Button { Text = T("Common.Cancel"), DialogResult = DialogResult.Cancel, Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         btnOk.Click += (_, _) => ApplyAll();
@@ -265,6 +273,34 @@ sealed class SettingsForm : Form
     /// Stacks controls vertically within a card. Replaces FlowLayoutPanel, which does
     /// not support Dock on its children.
     /// </summary>
+    /// <summary>
+    /// Measures how wide a button needs to be to show <paramref name="text"/> in full,
+    /// using the actual font it will render with — used instead of a guessed fixed pixel
+    /// Width, since localized button labels (Russian/Ukrainian especially) are often
+    /// significantly longer than their English source and a guessed width reliably clips
+    /// them.
+    /// </summary>
+    int MeasureButtonWidth(string text, int extraPadding = 24) =>
+        TextRenderer.MeasureText(text, Font).Width + extraPadding;
+
+    /// <summary>
+    /// The single place every plain action button (Add/Remove/Pick/Clear/Reset…) in this
+    /// dialog gets created — guarantees every button is the same height and has the same
+    /// zero top/bottom margin, so buttons placed next to each other in a row are always
+    /// level with each other. Hand-setting Margin per button (what this replaces) is exactly
+    /// what let buttons in the same row drift out of vertical alignment — one button with a
+    /// default Margin.Top of 3 and its neighbor with an explicit 0 sit 3px apart.
+    /// Horizontal spacing between buttons in a row is the caller's job (a right margin on
+    /// all but the last button, or a FlowLayoutPanel), since that varies by layout.
+    /// </summary>
+    Button MakeButton(string text) => new()
+    {
+        Text = text,
+        Width = MeasureButtonWidth(text),
+        Height = 28,
+        Margin = new Padding(0),
+    };
+
     static TableLayoutPanel VStack(params Control[] controls)
     {
         var table = new TableLayoutPanel
@@ -342,7 +378,7 @@ sealed class SettingsForm : Form
             _hotkeyBox.Text    = KeyLabel(_capturedKey);
             _hotkeyBox.Parent?.Focus();
         };
-        var btnClear = new Button { Text = T("Common.Clear"), Width = 56, Height = 24, Margin = new Padding(0, 1, 0, 0) };
+        var btnClear = MakeButton(T("Common.Clear"));
         btnClear.Click += (_, _) => { _capturedKey = Keys.None; _hotkeyBox.Text = KeyLabel(Keys.None); };
 
         hotkeyInner.Controls.Add(hint, 0, 0);
@@ -376,14 +412,8 @@ sealed class SettingsForm : Form
 
     static string KeyLabel(Keys k)
     {
-        if (k == Keys.None) return T("General.Hotkey.None");
-        var parts = new List<string>();
-        if ((k & Keys.Control) != 0) parts.Add("Ctrl");
-        if ((k & Keys.Shift)   != 0) parts.Add("Shift");
-        if ((k & Keys.Alt)     != 0) parts.Add("Alt");
-        var baseKey = k & Keys.KeyCode;
-        if (baseKey != Keys.None) parts.Add(baseKey.ToString());
-        return string.Join("+", parts);
+        var combo = HotkeyFormat.Combo(k);
+        return combo.Length > 0 ? combo : T("General.Hotkey.None");
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -424,7 +454,7 @@ sealed class SettingsForm : Form
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         table.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        table.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var hint = new Label
         {
@@ -434,13 +464,41 @@ sealed class SettingsForm : Form
 
         _exclusionsList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
 
-        var addRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
-        addRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        addRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _exclusionBox = new TextBox { Dock = DockStyle.Fill, PlaceholderText = T("Exclusions.Placeholder"), Margin = new Padding(0, 1, 6, 0) };
-        var btnAddExcl  = new Button { Text = T("Common.Add"), Width = 60, Height = 24 };
-        var btnPickExcl = new Button { Text = T("Exclusions.PickRunningApp"), Width = 110, Height = 24, Margin = new Padding(6, 0, 0, 0) };
-        var btnDelExcl  = new Button { Text = T("Common.Remove"), Width = 72, Height = 24, Margin = new Padding(6, 0, 0, 0) };
+        // A single 2-column grid (textbox/Pick on the left, Add/Remove stacked on the right)
+        // rather than two independently-sized rows — a TableLayoutPanel's AutoSize column
+        // width is the max of every cell in that column, so Add and Remove are guaranteed
+        // the same width and the same right edge by construction, not by matching numbers
+        // by hand across two separate containers (which is what kept drifting out of sync).
+        var addGrid = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, 6, 0, 0),
+        };
+        addGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        addGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        addGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        addGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        _exclusionBox = new TextBox { Dock = DockStyle.Fill, PlaceholderText = T("Exclusions.Placeholder"), Margin = new Padding(0, 3, 6, 4) };
+        // MinimumSize (not just Dock=Fill) is what the AutoSize column actually measures —
+        // a Dock=Fill control alone reports no real preferred size, so the column would
+        // collapse. The column's final width is the max MinimumSize across both rows, and
+        // Dock=Fill then stretches each button to that resolved width — guaranteeing Add and
+        // Remove end up pixel-identical in width without hand-matching numbers.
+        var btnAddExcl = new Button { Text = T("Common.Add"), Dock = DockStyle.Fill, MinimumSize = new Size(MeasureButtonWidth(T("Common.Add")), 28), Margin = new Padding(0, 0, 0, 4) };
+
+        var btnPickExcl = MakeButton(T("Exclusions.PickRunningApp"));
+        var btnBrowseExcl = MakeButton(T("Exclusions.BrowseExe"));
+        btnBrowseExcl.Margin = new Padding(6, 0, 0, 0);
+        var pickRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false,
+            AutoSize = true, Margin = new Padding(0, 0, 6, 2),
+        };
+        pickRow.Controls.AddRange([btnPickExcl, btnBrowseExcl]);
+
+        var btnDelExcl  = new Button { Text = T("Common.Remove"), Dock = DockStyle.Fill, MinimumSize = new Size(MeasureButtonWidth(T("Common.Remove")), 28), Margin = new Padding(0, 0, 0, 2) };
 
         void AddExclusionText(string name)
         {
@@ -461,6 +519,16 @@ sealed class SettingsForm : Form
             if (picker.ShowDialog(this) == DialogResult.OK && picker.SelectedProcessName is { } name)
                 AddExclusionText(name);
         };
+        btnBrowseExcl.Click += (_, _) =>
+        {
+            using var ofd = new OpenFileDialog
+            {
+                Title  = T("Exclusions.BrowseDialogTitle"),
+                Filter = T("Exclusions.BrowseFilter"),
+            };
+            if (ofd.ShowDialog(this) == DialogResult.OK)
+                AddExclusionText(Path.GetFileName(ofd.FileName));
+        };
         btnDelExcl.Click += (_, _) =>
         {
             int idx = _exclusionsList.SelectedIndex;
@@ -469,14 +537,14 @@ sealed class SettingsForm : Form
             _exclusionsList.Items.RemoveAt(idx);
         };
 
-        var addRowButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoSize = true };
-        addRowButtons.Controls.AddRange([btnAddExcl, btnPickExcl, btnDelExcl]);
-        addRow.Controls.Add(_exclusionBox, 0, 0);
-        addRow.Controls.Add(addRowButtons, 1, 0);
+        addGrid.Controls.Add(_exclusionBox, 0, 0);
+        addGrid.Controls.Add(btnAddExcl,    1, 0);
+        addGrid.Controls.Add(pickRow,       0, 1);
+        addGrid.Controls.Add(btnDelExcl,    1, 1);
 
-        table.Controls.Add(hint,     0, 0);
+        table.Controls.Add(hint,            0, 0);
         table.Controls.Add(_exclusionsList, 0, 1);
-        table.Controls.Add(addRow,   0, 2);
+        table.Controls.Add(addGrid,         0, 2);
         page.Controls.Add(table);
         return page;
     }
@@ -496,7 +564,7 @@ sealed class SettingsForm : Form
         var page  = new Panel { Dock = DockStyle.Fill };
         var outer = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };
         outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -505,20 +573,16 @@ sealed class SettingsForm : Form
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var label  = new Label  { Text = T("Abbreviations.Hint"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 0, 0) };
-        var btnAdd = new Button { Text = T("Common.Add"),    Width = 60, Height = 24, Margin = new Padding(4, 2, 4, 0) };
-        var btnDel = new Button { Text = T("Common.Remove"), Width = 72, Height = 24, Margin = new Padding(0, 2, 0, 0) };
+        var btnAdd = MakeButton(T("Common.Add"));
+        btnAdd.Margin = new Padding(4, 0, 4, 0);
+        var btnDel = MakeButton(T("Common.Remove"));
         toolbar.Controls.Add(label,  0, 0);
         toolbar.Controls.Add(btnAdd, 1, 0);
         toolbar.Controls.Add(btnDel, 2, 0);
 
         _abbrevListBox = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = false, IntegralHeight = false };
+        _abbrevEditor  = new CheckedListEditor<Abbreviation>(_abbrevListBox, a => a.Enabled, (a, v) => a.Enabled = v);
         _abbrevListBox.SelectedIndexChanged += (_, _) => RefreshAbbrevDetail();
-        _abbrevListBox.ItemCheck += (_, e) =>
-        {
-            if (_suppressAbbrev) return;
-            if (_abbrevListBox.Items[e.Index] is Abbreviation a)
-                a.Enabled = e.NewValue == CheckState.Checked;
-        };
         var listPanel = new Panel { Dock = DockStyle.Fill };
         listPanel.Controls.Add(_abbrevListBox);
 
@@ -547,31 +611,22 @@ sealed class SettingsForm : Form
         {
             var a = new Abbreviation { Trigger = "new", Expansion = "", Enabled = true };
             _abbreviations.Add(a);
-            _suppressAbbrev = true;
-            int idx = _abbrevListBox.Items.Add(a);
-            _abbrevListBox.SetItemChecked(idx, true);
-            _suppressAbbrev = false;
-            _abbrevListBox.SelectedIndex = idx;
+            _abbrevEditor.Add(a);
         };
         btnDel.Click += (_, _) =>
         {
-            int idx = _abbrevListBox.SelectedIndex;
-            if (idx < 0) return;
-            if (_abbrevListBox.Items[idx] is Abbreviation a) _abbreviations.Remove(a);
-            _abbrevListBox.Items.RemoveAt(idx);
+            var removed = _abbrevEditor.RemoveSelected();
+            if (removed is null) return;
+            _abbreviations.Remove(removed);
             if (_abbrevListBox.Items.Count == 0) RefreshAbbrevDetail();
         };
-        _abbrevTriggerBox.TextChanged += (_, _) =>
+        _abbrevTriggerBox.TextChanged += (_, _) => _abbrevEditor.WhenSelected(a =>
         {
-            if (_suppressAbbrev || SelectedAbbrev() is not { } a) return;
             a.Trigger = _abbrevTriggerBox.Text.Trim();
-            _abbrevListBox.Refresh();
-        };
-        _abbrevExpansionBox.TextChanged += (_, _) =>
-        {
-            if (_suppressAbbrev || SelectedAbbrev() is not { } a) return;
-            a.Expansion = _abbrevExpansionBox.Text;
-        };
+            _abbrevEditor.RefreshRows();
+        });
+        _abbrevExpansionBox.TextChanged += (_, _) => _abbrevEditor.WhenSelected(a =>
+            a.Expansion = _abbrevExpansionBox.Text);
 
         outer.Controls.Add(toolbar,   0, 0);
         outer.Controls.Add(listPanel, 0, 1);
@@ -582,33 +637,23 @@ sealed class SettingsForm : Form
 
     void LoadAbbrevList()
     {
-        _suppressAbbrev = true;
-        _abbrevListBox.Items.Clear();
-        foreach (var a in _abbreviations)
-        {
-            int idx = _abbrevListBox.Items.Add(a);
-            _abbrevListBox.SetItemChecked(idx, a.Enabled);
-        }
-        _suppressAbbrev = false;
-
-        if (_abbrevListBox.Items.Count > 0) _abbrevListBox.SelectedIndex = 0;
+        _abbrevEditor.LoadList(_abbreviations);
         RefreshAbbrevDetail();
     }
 
     void RefreshAbbrevDetail()
     {
-        var a = SelectedAbbrev();
+        var a = _abbrevEditor.SelectedItem;
         bool hasSel = a is not null;
         _abbrevTriggerBox.Enabled   = hasSel;
         _abbrevExpansionBox.Enabled = hasSel;
 
-        _suppressAbbrev = true;
-        _abbrevTriggerBox.Text   = a?.Trigger   ?? "";
-        _abbrevExpansionBox.Text = a?.Expansion ?? "";
-        _suppressAbbrev = false;
+        _abbrevEditor.WithSuppressed(() =>
+        {
+            _abbrevTriggerBox.Text   = a?.Trigger   ?? "";
+            _abbrevExpansionBox.Text = a?.Expansion ?? "";
+        });
     }
-
-    Abbreviation? SelectedAbbrev() => _abbrevListBox.SelectedItem as Abbreviation;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Statistics section
@@ -644,8 +689,9 @@ sealed class SettingsForm : Form
         };
 
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
-        var btnResetStats   = new Button { Text = T("Statistics.ResetStats"), Width = 110, Height = 24 };
-        var btnResetLearned = new Button { Text = T("Statistics.ResetLearned"), Width = 130, Height = 24, Margin = new Padding(8, 0, 0, 0) };
+        var btnResetStats   = MakeButton(T("Statistics.ResetStats"));
+        var btnResetLearned = MakeButton(T("Statistics.ResetLearned"));
+        btnResetLearned.Margin = new Padding(8, 0, 0, 0);
         btnResetStats.Click += (_, _) =>
         {
             _stats.WordsCorrected = 0;
@@ -680,7 +726,7 @@ sealed class SettingsForm : Form
         var seconds = _stats.CharactersFixed * 0.3;
         _statTime.Text = seconds < 60 ? $"~{seconds:N0}s" : $"~{seconds / 60:N0}m";
 
-        _statLearned.Text = _undoCounts.Count(kv => kv.Value >= _settings.UndoLearnThreshold).ToString("N0");
+        _statLearned.Text = LearnedWordCount.ToString("N0");
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -832,7 +878,7 @@ sealed class SettingsForm : Form
         var page  = new Panel { Dock = DockStyle.Fill };
         var outer = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };
         outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -852,8 +898,9 @@ sealed class SettingsForm : Form
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         var label  = new Label  { Text = T("Dictionaries.Hint"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 0, 0) };
-        var btnAdd = new Button { Text = T("Common.Add"),    Width = 60, Height = 24, Margin = new Padding(4, 2, 4, 0) };
-        var btnDel = new Button { Text = T("Common.Remove"), Width = 72, Height = 24, Margin = new Padding(0, 2, 0, 0) };
+        var btnAdd = MakeButton(T("Common.Add"));
+        btnAdd.Margin = new Padding(4, 0, 4, 0);
+        var btnDel = MakeButton(T("Common.Remove"));
 
         btnAdd.Click += (_, _) => AddDictionary();
         btnDel.Click += (_, _) => RemoveDictionary();
@@ -872,13 +919,8 @@ sealed class SettingsForm : Form
         {
             Dock = DockStyle.Fill, CheckOnClick = false, IntegralHeight = false,
         };
+        _dictEditor = new CheckedListEditor<UserDictionary>(_dictListBox, d => d.Enabled, (d, v) => d.Enabled = v);
         _dictListBox.SelectedIndexChanged += (_, _) => RefreshDictDetail();
-        _dictListBox.ItemCheck += (_, e) =>
-        {
-            if (_suppressDict) return;
-            if (_dictListBox.Items[e.Index] is UserDictionary d)
-                d.Enabled = e.NewValue == CheckState.Checked;
-        };
 
         panel.Controls.Add(_dictListBox);
         return panel;
@@ -908,10 +950,10 @@ sealed class SettingsForm : Form
 
         var lblUrl   = new Label { Text = T("Dictionaries.Url"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
         _dictUrlBox  = new TextBox { Dock = DockStyle.Fill, Margin = new Padding(4, 2, 4, 4) };
-        _dictDlBtn   = new Button  { Text = T("Dictionaries.Download"), Dock = DockStyle.Fill, Height = 24, Margin = new Padding(0, 2, 0, 4) };
+        _dictDlBtn   = new Button  { Text = T("Dictionaries.Download"), Dock = DockStyle.Fill, Height = 28, Margin = new Padding(0, 2, 0, 4) };
         _dictDlBtn.Click += async (_, _) => await DownloadSelectedDict();
 
-        _dictImportBtn = new Button { Text = T("Dictionaries.ImportFromFile"), AutoSize = true, Height = 24, Margin = new Padding(0, 2, 0, 4), Anchor = AnchorStyles.Left };
+        _dictImportBtn = new Button { Text = T("Dictionaries.ImportFromFile"), AutoSize = true, Height = 28, Margin = new Padding(0, 2, 0, 4), Anchor = AnchorStyles.Left };
         _dictImportBtn.Click += (_, _) => ImportSelectedDict();
 
         _dictStatus = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
@@ -933,46 +975,31 @@ sealed class SettingsForm : Form
         panel.SetColumnSpan(_dictStatus, 4);
         panel.Controls.Add(_dictStatus, 0, 3);
 
-        _dictNameBox.TextChanged += (_, _) =>
+        _dictNameBox.TextChanged += (_, _) => _dictEditor.WhenSelected(d =>
         {
-            if (_suppressDict || SelectedDict() is not { } d) return;
             d.Name = _dictNameBox.Text;
-            _dictListBox.Refresh();
-        };
-        _dictLangBox.TextChanged += (_, _) =>
+            _dictEditor.RefreshRows();
+        });
+        _dictLangBox.TextChanged += (_, _) => _dictEditor.WhenSelected(d =>
         {
-            if (_suppressDict || SelectedDict() is not { } d) return;
             d.Lang = _dictLangBox.Text.Trim().ToLowerInvariant();
-            _dictListBox.Refresh();
+            _dictEditor.RefreshRows();
             RefreshDictStatus(d);
-        };
-        _dictUrlBox.TextChanged += (_, _) =>
-        {
-            if (_suppressDict || SelectedDict() is not { } d) return;
-            d.Url = _dictUrlBox.Text.Trim();
-        };
+        });
+        _dictUrlBox.TextChanged += (_, _) => _dictEditor.WhenSelected(d => d.Url = _dictUrlBox.Text.Trim());
 
         return panel;
     }
 
     void LoadDictList()
     {
-        _suppressDict = true;
-        _dictListBox.Items.Clear();
-        foreach (var d in _dicts)
-        {
-            int idx = _dictListBox.Items.Add(d);
-            _dictListBox.SetItemChecked(idx, d.Enabled);
-        }
-        _suppressDict = false;
-
-        if (_dictListBox.Items.Count > 0) _dictListBox.SelectedIndex = 0;
+        _dictEditor.LoadList(_dicts);
         RefreshDictDetail();
     }
 
     void RefreshDictDetail()
     {
-        var dict    = SelectedDict();
+        var dict    = _dictEditor.SelectedItem;
         bool hasSel = dict is not null;
 
         _dictNameBox.Enabled = hasSel;
@@ -981,11 +1008,12 @@ sealed class SettingsForm : Form
         _dictDlBtn.Enabled   = hasSel;
         _dictImportBtn.Enabled = hasSel;
 
-        _suppressDict = true;
-        _dictNameBox.Text = dict?.Name ?? "";
-        _dictLangBox.Text = dict?.Lang ?? "";
-        _dictUrlBox.Text  = dict?.Url  ?? "";
-        _suppressDict = false;
+        _dictEditor.WithSuppressed(() =>
+        {
+            _dictNameBox.Text = dict?.Name ?? "";
+            _dictLangBox.Text = dict?.Lang ?? "";
+            _dictUrlBox.Text  = dict?.Url  ?? "";
+        });
 
         if (dict is not null) RefreshDictStatus(dict);
         else _dictStatus.Text = "";
@@ -1010,41 +1038,43 @@ sealed class SettingsForm : Form
     {
         var dict = new UserDictionary { Name = T("Dictionaries.NewDictionaryName"), Enabled = true };
         _dicts.Add(dict);
-
-        _suppressDict = true;
-        int idx = _dictListBox.Items.Add(dict);
-        _dictListBox.SetItemChecked(idx, true);
-        _suppressDict = false;
-
-        _dictListBox.SelectedIndex = idx;
+        _dictEditor.Add(dict);
     }
 
     void RemoveDictionary()
     {
-        int idx = _dictListBox.SelectedIndex;
-        if (idx < 0) return;
-        if (_dictListBox.Items[idx] is UserDictionary d) _dicts.Remove(d);
-        _dictListBox.Items.RemoveAt(idx);
-        if (_dictListBox.Items.Count > 0)
-            _dictListBox.SelectedIndex = Math.Min(idx, _dictListBox.Items.Count - 1);
-        else
-            RefreshDictDetail();
+        var removed = _dictEditor.RemoveSelected();
+        if (removed is null) return;
+        _dicts.Remove(removed);
+        if (_dictListBox.Items.Count == 0) RefreshDictDetail();
     }
 
-    async Task DownloadSelectedDict()
+    /// <summary>Validates there's a selected dictionary with a non-empty language code,
+    /// showing the standard warning and returning false if not — shared by
+    /// DownloadSelectedDict and ImportSelectedDict, which otherwise repeat this exact guard.</summary>
+    bool TryGetSelectedLang([NotNullWhen(true)] out UserDictionary? dict, out string lang)
     {
-        var dict = SelectedDict();
-        if (dict is null) return;
-
-        var lang = _dictLangBox.Text.Trim().ToLowerInvariant();
-        var url  = _dictUrlBox.Text.Trim();
-
+        dict = SelectedDict();
+        lang = _dictLangBox.Text.Trim().ToLowerInvariant();
+        if (dict is null) return false;
         if (string.IsNullOrEmpty(lang))
         {
             MessageBox.Show(T("Dictionaries.EnterLangCode"), T("Common.AppName"),
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            return false;
         }
+        return true;
+    }
+
+    void ShowGenericError(Exception ex) =>
+        MessageBox.Show(string.Format(T("Dictionaries.GenericError"), ex.Message), T("Common.AppName"),
+            MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+    async Task DownloadSelectedDict()
+    {
+        if (!TryGetSelectedLang(out var dict, out var lang)) return;
+
+        var url = _dictUrlBox.Text.Trim();
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
@@ -1072,8 +1102,7 @@ sealed class SettingsForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(string.Format(T("Dictionaries.GenericError"), ex.Message), T("Common.AppName"),
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            ShowGenericError(ex);
         }
         finally
         {
@@ -1092,16 +1121,7 @@ sealed class SettingsForm : Form
     /// </summary>
     void ImportSelectedDict()
     {
-        var dict = SelectedDict();
-        if (dict is null) return;
-
-        var lang = _dictLangBox.Text.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(lang))
-        {
-            MessageBox.Show(T("Dictionaries.EnterLangCode"), T("Common.AppName"),
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
+        if (!TryGetSelectedLang(out var dict, out var lang)) return;
 
         using var ofd = new OpenFileDialog
         {
@@ -1141,33 +1161,41 @@ sealed class SettingsForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(string.Format(T("Dictionaries.GenericError"), ex.Message), T("Common.AppName"),
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            ShowGenericError(ex);
         }
     }
 
-    UserDictionary? SelectedDict() => _dictListBox.SelectedItem as UserDictionary;
+    UserDictionary? SelectedDict() => _dictEditor.SelectedItem;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Load / commit
     // ═══════════════════════════════════════════════════════════════════════
 
+    /// <summary>Single source of truth for the PopupSize radio group, used by both
+    /// LoadDisplayValues and SaveDisplayValues instead of a switch and a ternary chain that
+    /// have to be kept in sync by hand.</summary>
+    (RadioButton Button, FlagDisplaySize Value)[] SizeOptions =>
+    [
+        (_sizeSmall, FlagDisplaySize.Small),
+        (_sizeMedium, FlagDisplaySize.Medium),
+        (_sizeLarge, FlagDisplaySize.Large),
+    ];
+
+    /// <summary>Same idea as <see cref="SizeOptions"/>, for the PopupPosition radio group.</summary>
+    (RadioButton Button, ScreenCorner Value)[] CornerOptions =>
+    [
+        (_cornerTL, ScreenCorner.TopLeft),
+        (_cornerTR, ScreenCorner.TopRight),
+        (_cornerBL, ScreenCorner.BottomLeft),
+        (_cornerBR, ScreenCorner.BottomRight),
+    ];
+
     void LoadDisplayValues()
     {
-        (_settings.PopupSize switch
-        {
-            FlagDisplaySize.Small => _sizeSmall,
-            FlagDisplaySize.Large => _sizeLarge,
-            _                     => _sizeMedium,
-        }).Checked = true;
-
-        (_settings.PopupPosition switch
-        {
-            ScreenCorner.TopLeft    => _cornerTL,
-            ScreenCorner.TopRight   => _cornerTR,
-            ScreenCorner.BottomLeft => _cornerBL,
-            _                       => _cornerBR,
-        }).Checked = true;
+        SizeOptions.FirstOrDefault(o => o.Value == _settings.PopupSize, (Button: _sizeMedium, Value: FlagDisplaySize.Medium))
+            .Button.Checked = true;
+        CornerOptions.FirstOrDefault(o => o.Value == _settings.PopupPosition, (Button: _cornerBR, Value: ScreenCorner.BottomRight))
+            .Button.Checked = true;
 
         _autocorrectBox.Checked       = _settings.AutocorrectEnabled;
         _notifyWrongLayoutBox.Checked = _settings.NotifyWrongLayout;
@@ -1184,22 +1212,13 @@ sealed class SettingsForm : Form
         RefreshLearnedWordsLabel();
     }
 
-    void RefreshLearnedWordsLabel()
-    {
-        int learned = _undoCounts.Count(kv => kv.Value >= _settings.UndoLearnThreshold);
-        _learnedWordsLabel.Text = string.Format(T("General.Advanced.LearnedWordsCount"), learned);
-    }
+    void RefreshLearnedWordsLabel() =>
+        _learnedWordsLabel.Text = string.Format(T("General.Advanced.LearnedWordsCount"), LearnedWordCount);
 
     void SaveDisplayValues()
     {
-        _settings.PopupSize = _sizeSmall.Checked ? FlagDisplaySize.Small
-            : _sizeLarge.Checked ? FlagDisplaySize.Large
-            : FlagDisplaySize.Medium;
-
-        _settings.PopupPosition = _cornerTL.Checked ? ScreenCorner.TopLeft
-            : _cornerTR.Checked ? ScreenCorner.TopRight
-            : _cornerBL.Checked ? ScreenCorner.BottomLeft
-            : ScreenCorner.BottomRight;
+        _settings.PopupSize = SizeOptions.First(o => o.Button.Checked).Value;
+        _settings.PopupPosition = CornerOptions.First(o => o.Button.Checked).Value;
 
         _settings.ConvertHotKey     = _capturedKey;
         _settings.AutocorrectEnabled = _autocorrectBox.Checked;

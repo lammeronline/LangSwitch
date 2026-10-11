@@ -58,6 +58,9 @@
   "Exclusions.Hint": "LangSwitch won't autocorrect or notify while these applications are focused\n(process name, e.g. cmd.exe):",
   "Exclusions.Placeholder": "e.g. notepad.exe",
   "Exclusions.PickRunningApp": "Pick running app…",
+  "Exclusions.BrowseExe": "Browse…",
+  "Exclusions.BrowseDialogTitle": "Select an application",
+  "Exclusions.BrowseFilter": "Applications (*.exe)|*.exe|All files (*.*)|*.*",
 
   "Abbreviations.Hint": "Type a trigger word, it expands as you finish typing it:",
   "Abbreviations.Trigger": "Trigger:",
@@ -116,5 +119,7 @@
   "Balloon.PressToFix": " (press {0} to fix)",
   "Balloon.ErrorPrefix": "Error: {0}",
 
-  "AppPicker.Title": "Pick a running app"
+  "AppPicker.Title": "Pick a running app",
+  "AppPicker.ColumnTitle": "Window",
+  "AppPicker.ColumnProcess": "Process"
 }

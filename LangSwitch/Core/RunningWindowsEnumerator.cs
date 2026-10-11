@@ -15,9 +15,9 @@ static class RunningWindowsEnumerator
     static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
 
-    public static List<(string ProcessName, string Title)> GetVisibleAppWindows()
+    public static List<(string ProcessName, string Title, string? ExePath)> GetVisibleAppWindows()
     {
-        var result = new List<(string ProcessName, string Title)>();
+        var result = new List<(string ProcessName, string Title, string? ExePath)>();
 
         EnumWindows((hwnd, _) =>
         {
@@ -35,7 +35,13 @@ static class RunningWindowsEnumerator
             try
             {
                 using var proc = Process.GetProcessById((int)pid);
-                result.Add((proc.ProcessName + ".exe", title));
+                // MainModule throws Win32Exception for processes we don't have access to
+                // (elevated/other-user) — the exe path is a nice-to-have (for the app
+                // picker's icon), not essential, so that failure alone shouldn't drop the
+                // whole entry.
+                string? exePath = null;
+                try { exePath = proc.MainModule?.FileName; } catch { }
+                result.Add((proc.ProcessName + ".exe", title, exePath));
             }
             catch { }
 

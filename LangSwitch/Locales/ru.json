@@ -58,6 +58,9 @@
   "Exclusions.Hint": "LangSwitch не будет автоисправлять или уведомлять, пока активны эти приложения\n(имя процесса, напр. cmd.exe):",
   "Exclusions.Placeholder": "напр. notepad.exe",
   "Exclusions.PickRunningApp": "Выбрать запущенное приложение…",
+  "Exclusions.BrowseExe": "Обзор…",
+  "Exclusions.BrowseDialogTitle": "Выберите приложение",
+  "Exclusions.BrowseFilter": "Приложения (*.exe)|*.exe|Все файлы (*.*)|*.*",
 
   "Abbreviations.Hint": "Введите слово-триггер — оно раскроется, как только вы его допечатаете:",
   "Abbreviations.Trigger": "Триггер:",
@@ -116,5 +119,7 @@
   "Balloon.PressToFix": " (нажмите {0}, чтобы исправить)",
   "Balloon.ErrorPrefix": "Ошибка: {0}",
 
-  "AppPicker.Title": "Выбор запущенного приложения"
+  "AppPicker.Title": "Выбор запущенного приложения",
+  "AppPicker.ColumnTitle": "Окно",
+  "AppPicker.ColumnProcess": "Процесс"
 }

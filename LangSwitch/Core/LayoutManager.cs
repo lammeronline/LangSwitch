@@ -145,9 +145,8 @@ static class LayoutManager
 
             if (!int.TryParse(klid[4..], NumberStyles.HexNumber, null, out int langId)) continue;
 
-            CultureInfo culture;
-            try { culture = new CultureInfo(langId); }
-            catch { continue; }
+            var culture = CultureHelper.TryParse(langId);
+            if (culture is null) continue;
 
             result.Add(new AvailableLayout
             {
@@ -187,10 +186,15 @@ static class LayoutManager
 
     // ── Registry helpers ────────────────────────────────────────────────────
 
+    const string PreloadKeyPath = @"Keyboard Layout\Preload";
+
+    static Microsoft.Win32.RegistryKey? OpenPreloadKey(bool writable = false) =>
+        Registry.CurrentUser.OpenSubKey(PreloadKeyPath, writable);
+
     static HashSet<string> GetInstalledKlids()
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var key = Registry.CurrentUser.OpenSubKey(@"Keyboard Layout\Preload");
+        using var key = OpenPreloadKey();
         if (key is null) return set;
 
         foreach (var name in key.GetValueNames())
@@ -202,7 +206,7 @@ static class LayoutManager
 
     static void AddToPreload(string klid)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(@"Keyboard Layout\Preload", writable: true);
+        using var key = OpenPreloadKey(writable: true);
         if (key is null) return;
 
         // Skip if already present
@@ -222,7 +226,7 @@ static class LayoutManager
 
     static void RemoveFromPreload(string klid)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(@"Keyboard Layout\Preload", writable: true);
+        using var key = OpenPreloadKey(writable: true);
         if (key is null) return;
 
         foreach (var name in key.GetValueNames())

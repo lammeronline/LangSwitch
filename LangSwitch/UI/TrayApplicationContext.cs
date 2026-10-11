@@ -362,17 +362,13 @@ sealed class TrayApplicationContext : ApplicationContext
     {
         if (!string.IsNullOrEmpty(buf))
         {
-            var converted = _candidates.ConvertToOppositeLayout(buf, _langDicts);
-            if (converted == buf) { Balloon(T("Balloon.CantDetermineLayout")); return; }
-
+            if (!TryConvertWord(buf, out var converted)) return;
             _tracker.Set(converted);
             await ReplaceViaClipboardAsync(buf.Length, converted);
         }
         else if (!string.IsNullOrEmpty(lastWord))
         {
-            var converted = _candidates.ConvertToOppositeLayout(lastWord, _langDicts);
-            if (converted == lastWord) { Balloon(T("Balloon.CantDetermineLayout")); return; }
-
+            if (!TryConvertWord(lastWord, out var converted)) return;
             int deleteCount = lastWord.Length + (lastBound != '\0' ? 1 : 0);
             string insert   = converted + (lastBound != '\0' ? lastBound.ToString() : "");
             await ReplaceViaClipboardAsync(deleteCount, insert);
@@ -381,6 +377,18 @@ sealed class TrayApplicationContext : ApplicationContext
         {
             Balloon(T("Balloon.NoWordToConvert"));
         }
+    }
+
+    /// <summary>Converts a word to the opposite layout, surfacing the "can't determine
+    /// layout" balloon and returning false if the conversion came back unchanged — shared by
+    /// both TryConvertWordAsync branches (in-progress word vs. last completed word), which
+    /// otherwise repeat this exact check.</summary>
+    bool TryConvertWord(string word, out string converted)
+    {
+        converted = _candidates.ConvertToOppositeLayout(word, _langDicts);
+        if (converted != word) return true;
+        Balloon(T("Balloon.CantDetermineLayout"));
+        return false;
     }
 
     async Task ReplaceViaClipboardAsync(int deleteCount, string insert)
@@ -428,7 +436,7 @@ sealed class TrayApplicationContext : ApplicationContext
             if (corrected is not null)
             {
                 var hotKey = _settings.ConvertHotKey != Keys.None
-                    ? string.Format(T("Balloon.PressToFix"), HotKeyLabel(_settings.ConvertHotKey))
+                    ? string.Format(T("Balloon.PressToFix"), HotkeyFormat.Combo(_settings.ConvertHotKey))
                     : "";
                 Balloon(string.Format(T("Balloon.WrongLayout"), corrected, hotKey));
             }
@@ -463,7 +471,7 @@ sealed class TrayApplicationContext : ApplicationContext
 
         var menu = new ContextMenuStrip();
         menu.Items.Add(_autocorrectItem);
-        var hotKeyLabel = _settings.ConvertHotKey == Keys.None ? "" : $" ({HotKeyLabel(_settings.ConvertHotKey)})";
+        var hotKeyLabel = _settings.ConvertHotKey == Keys.None ? "" : $" ({HotkeyFormat.Combo(_settings.ConvertHotKey)})";
         menu.Items.Add($"{T("Menu.ConvertWord")}{hotKeyLabel}", null, (_, _) => ScheduleConvert());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(T("Menu.Settings"), null, (_, _) => OpenSettings());
@@ -472,18 +480,6 @@ sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(T("Menu.Exit"), null, (_, _) => Quit());
         menu.Opening += (_, _) => MenuTheme.Apply(menu);
         return menu;
-    }
-
-    static string HotKeyLabel(Keys k)
-    {
-        if (k == Keys.None) return "";
-        var parts = new List<string>();
-        if ((k & Keys.Control) != 0) parts.Add("Ctrl");
-        if ((k & Keys.Shift)   != 0) parts.Add("Shift");
-        if ((k & Keys.Alt)     != 0) parts.Add("Alt");
-        var baseKey = k & Keys.KeyCode;
-        if (baseKey != Keys.None) parts.Add(baseKey.ToString());
-        return string.Join("+", parts);
     }
 
     void OnTrayClick(object? sender, MouseEventArgs e)

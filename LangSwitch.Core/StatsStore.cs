@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace LangSwitch.Core;
 
 public sealed class Stats
@@ -11,34 +9,9 @@ public sealed class Stats
 
 public static class StatsStore
 {
-    static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "stats.json");
+    const string FileName = "stats.json";
 
-    static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    public static Stats Load() => JsonFileStore.Load(FileName, () => new Stats());
 
-    public static Stats Load()
-    {
-        try
-        {
-            if (!File.Exists(FilePath)) return new Stats();
-            var json = File.ReadAllText(FilePath);
-            return JsonSerializer.Deserialize<Stats>(json, JsonOptions) ?? new Stats();
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error(ex);
-            return new Stats();
-        }
-    }
-
-    public static void Save(Stats stats)
-    {
-        try
-        {
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(stats, JsonOptions));
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error(ex);
-        }
-    }
+    public static void Save(Stats stats) => JsonFileStore.Save(FileName, stats);
 }

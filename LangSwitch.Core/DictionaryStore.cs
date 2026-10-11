@@ -1,12 +1,8 @@
-using System.Text.Json;
-
 namespace LangSwitch.Core;
 
 public static class DictionaryStore
 {
-    static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "dictionaries.json");
-
-    static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    const string FileName = "dictionaries.json";
 
     /// <param name="seedLangs">
     /// Language codes to seed a default dictionary entry for when no
@@ -15,34 +11,14 @@ public static class DictionaryStore
     /// </param>
     public static List<UserDictionary> Load(IEnumerable<string> seedLangs)
     {
-        try
-        {
-            if (!File.Exists(FilePath)) return Defaults(seedLangs);
-            var json = File.ReadAllText(FilePath);
-            var list = JsonSerializer.Deserialize<List<UserDictionary>>(json, JsonOptions) ?? [];
-            if (list.Count == 0) return Defaults(seedLangs);
+        var list = JsonFileStore.Load<List<UserDictionary>>(FileName, () => []);
+        if (list.Count == 0) return Defaults(seedLangs);
 
-            RefreshStaleDefaultUrls(list);
-            return list;
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error(ex);
-            return Defaults(seedLangs);
-        }
+        RefreshStaleDefaultUrls(list);
+        return list;
     }
 
-    public static void Save(List<UserDictionary> dicts)
-    {
-        try
-        {
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(dicts, JsonOptions));
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error(ex);
-        }
-    }
+    public static void Save(List<UserDictionary> dicts) => JsonFileStore.Save(FileName, dicts);
 
     static List<UserDictionary> Defaults(IEnumerable<string> seedLangs)
     {
@@ -84,9 +60,6 @@ public static class DictionaryStore
         if (changed) Save(dicts);
     }
 
-    static string CultureDisplayName(string lang)
-    {
-        try { return new System.Globalization.CultureInfo(lang).EnglishName; }
-        catch { return lang.ToUpperInvariant(); }
-    }
+    static string CultureDisplayName(string lang) =>
+        CultureHelper.TryParse(lang)?.EnglishName ?? lang.ToUpperInvariant();
 }
