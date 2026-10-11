@@ -4,20 +4,23 @@ public static class WordListDownloader
 {
     static readonly HttpClient Http = new();
 
-    static readonly Dictionary<string, string> Sources = new()
+    // Same source (hermitdave/FrequencyWords) works for ~60 languages under this path
+    // pattern; en/ru/uk are pinned to a verified year, everything else uses the common
+    // "2018" layout. Best-effort — the URL field in Settings → Dictionaries is freely
+    // editable if a language's actual path doesn't match.
+    static readonly Dictionary<string, string> KnownYears = new()
     {
-        ["en"] = "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/en/en_50k.txt",
-        ["ru"] = "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/ru/ru_50k.txt",
-        ["uk"] = "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/uk/uk_50k.txt",
+        ["en"] = "2016", ["ru"] = "2016", ["uk"] = "2016",
     };
 
-    public static string UrlFor(string lang) =>
-        Sources.TryGetValue(lang, out var url) ? url : "";
+    public static string UrlFor(string lang)
+    {
+        var year = KnownYears.GetValueOrDefault(lang, "2018");
+        return $"https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/{year}/{lang}/{lang}_50k.txt";
+    }
 
     public static Task<int> DownloadAsync(string lang, IProgress<string>? progress = null) =>
-        Sources.TryGetValue(lang, out var url)
-            ? DownloadAsync(lang, url, progress)
-            : throw new ArgumentException($"Unknown language: {lang}");
+        DownloadAsync(lang, UrlFor(lang), progress);
 
     public static async Task<int> DownloadAsync(string lang, string url, IProgress<string>? progress = null)
     {

@@ -12,7 +12,8 @@ public class LayoutAutoCorrectorTests
     {
         var dicts = Dicts("en", "ru");
         // "ghbdtn" on an EN layout = "привет" typed on RU layout
-        var result = LayoutAutoCorrector.TryCorrect("ghbdtn", dicts);
+        var candidates = new[] { ("привет", "ru") };
+        var result = LayoutAutoCorrector.TryCorrect("ghbdtn", candidates, dicts);
         Assert.Equal("привет", result);
     }
 
@@ -20,7 +21,8 @@ public class LayoutAutoCorrectorTests
     public void TryCorrect_AlreadyValidWord_ReturnsNull()
     {
         var dicts = Dicts("en", "ru");
-        var result = LayoutAutoCorrector.TryCorrect("hello", dicts);
+        var candidates = new[] { ("руддщ", "ru") }; // irrelevant — original is already known
+        var result = LayoutAutoCorrector.TryCorrect("hello", candidates, dicts);
         Assert.Null(result);
     }
 
@@ -28,8 +30,9 @@ public class LayoutAutoCorrectorTests
     public void TryCorrect_UnknownGibberishInAnyLanguage_ReturnsNull()
     {
         var dicts = Dicts("en", "ru");
-        // Neither "zzqxw" nor its RU/UK candidates are real words.
-        var result = LayoutAutoCorrector.TryCorrect("zzqxw", dicts);
+        // Neither "zzqxw" nor its candidates are real words in any loaded dictionary.
+        var candidates = new[] { ("zzqxw", "ru"), ("zzqxw", "en") };
+        var result = LayoutAutoCorrector.TryCorrect("zzqxw", candidates, dicts);
         Assert.Null(result);
     }
 
@@ -37,7 +40,15 @@ public class LayoutAutoCorrectorTests
     public void TryCorrect_TooShortWord_ReturnsNull()
     {
         var dicts = Dicts("en", "ru");
-        var result = LayoutAutoCorrector.TryCorrect("a", dicts);
+        var result = LayoutAutoCorrector.TryCorrect("a", [], dicts);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void TryCorrect_NoCandidates_ReturnsNull()
+    {
+        var dicts = Dicts("en", "ru");
+        var result = LayoutAutoCorrector.TryCorrect("hello", [], dicts);
         Assert.Null(result);
     }
 }

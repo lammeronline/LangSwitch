@@ -13,6 +13,7 @@ sealed class TrayApplicationContext : ApplicationContext
     readonly KeyboardHook _hook;
     readonly WordTracker _tracker;
     readonly AutocorrectEngine _engine;
+    readonly ILayoutCandidateProvider _candidates;
     readonly LanguageDictionaries _langDicts;
     List<UserDictionary> _dicts;
     List<Abbreviation> _abbreviations;
@@ -28,10 +29,13 @@ sealed class TrayApplicationContext : ApplicationContext
     public TrayApplicationContext()
     {
         _settings      = SettingsStore.Load();
-        _dicts         = DictionaryStore.Load();
+        var seedLangs  = WindowsLayoutDetector.GetInstalledLayouts()
+            .Select(l => l.Culture.TwoLetterISOLanguageName).Distinct();
+        _dicts         = DictionaryStore.Load(seedLangs);
         _abbreviations = AbbreviationStore.Load();
         _langDicts     = new LanguageDictionaries(_dicts);
-        _engine        = new AutocorrectEngine(_langDicts, new WinTextInjector(), _abbreviations, _settings.FixCapsLock);
+        _candidates    = new LayoutCandidateGenerator(new WinLayoutCharMapSource());
+        _engine        = new AutocorrectEngine(_langDicts, new WinTextInjector(), _candidates, _abbreviations, _settings.FixCapsLock);
 
         _popup   = new FlagPopupForm(_settings);
         _monitor = new LayoutMonitor();
@@ -162,7 +166,7 @@ sealed class TrayApplicationContext : ApplicationContext
             return false;
         }
 
-        var converted = LayoutConverter.ConvertToOppositeLayout(text);
+        var converted = _candidates.ConvertToOppositeLayout(text);
         if (converted == text)
         {
             await ClipSetAsync(prevClip);
@@ -186,7 +190,7 @@ sealed class TrayApplicationContext : ApplicationContext
     {
         if (!string.IsNullOrEmpty(buf))
         {
-            var converted = LayoutConverter.ConvertToOppositeLayout(buf);
+            var converted = _candidates.ConvertToOppositeLayout(buf);
             if (converted == buf) { Balloon("Can't determine target layout"); return; }
 
             _tracker.Set(converted);
@@ -194,7 +198,7 @@ sealed class TrayApplicationContext : ApplicationContext
         }
         else if (!string.IsNullOrEmpty(lastWord))
         {
-            var converted = LayoutConverter.ConvertToOppositeLayout(lastWord);
+            var converted = _candidates.ConvertToOppositeLayout(lastWord);
             if (converted == lastWord) { Balloon("Can't determine target layout"); return; }
 
             int deleteCount = lastWord.Length + (lastBound != '\0' ? 1 : 0);
@@ -238,7 +242,7 @@ sealed class TrayApplicationContext : ApplicationContext
 
         if (_settings.NotifyWrongLayout)
         {
-            var corrected = LayoutAutoCorrector.TryCorrect(e.Word, _langDicts);
+            var corrected = LayoutAutoCorrector.TryCorrect(e.Word, _candidates.GetAllCandidates(e.Word), _langDicts);
             if (corrected is not null)
             {
                 var hotKey = _settings.ConvertHotKey != Keys.None

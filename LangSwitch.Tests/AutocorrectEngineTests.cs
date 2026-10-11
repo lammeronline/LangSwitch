@@ -10,6 +10,20 @@ sealed class FakeTextInjector : ITextInjector
     public void Replace(int deleteCount, string newText) => Calls.Add((deleteCount, newText));
 }
 
+/// <summary>Canned candidates keyed case-insensitively by the typed word, standing in for
+/// the real Win32-backed <see cref="LayoutCandidateGenerator"/> so tests stay deterministic.</summary>
+sealed class FakeLayoutCandidateProvider(Dictionary<string, (string Word, string Lang)[]>? byWord = null) : ILayoutCandidateProvider
+{
+    readonly Dictionary<string, (string Word, string Lang)[]> _byWord =
+        new(byWord ?? [], StringComparer.OrdinalIgnoreCase);
+
+    public IEnumerable<(string Word, string Lang)> GetAllCandidates(string word) =>
+        _byWord.TryGetValue(word, out var c) ? c : [];
+
+    public string ConvertToOppositeLayout(string text) =>
+        GetAllCandidates(text).Select(c => c.Word).FirstOrDefault(w => w != text) ?? text;
+}
+
 public class AutocorrectEngineTests
 {
     static LanguageDictionaries Dicts(params string[] langs) =>
@@ -18,10 +32,14 @@ public class AutocorrectEngineTests
     static WordReadyEventArgs WordReady(string word, char boundary = ' ') =>
         new(word, boundary, new HookKeyEventArgs(Keys.Space, 0));
 
+    static readonly ILayoutCandidateProvider DefaultCandidates = new FakeLayoutCandidateProvider(
+        new() { ["ghbdtn"] = [("привет", "ru")] });
+
     static AutocorrectEngine Engine(
         LanguageDictionaries dicts, ITextInjector injector,
-        List<Abbreviation>? abbreviations = null, bool fixCapsLock = true) =>
-        new(dicts, injector, abbreviations ?? [], fixCapsLock);
+        List<Abbreviation>? abbreviations = null, bool fixCapsLock = true,
+        ILayoutCandidateProvider? candidates = null) =>
+        new(dicts, injector, candidates ?? DefaultCandidates, abbreviations ?? [], fixCapsLock);
 
     [Fact]
     public void TryReplace_KnownWord_DoesNotInject()

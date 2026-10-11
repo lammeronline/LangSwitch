@@ -5,6 +5,7 @@ namespace LangSwitch.Autocorrect;
 sealed class AutocorrectEngine
 {
     readonly ITextInjector _injector;
+    readonly ILayoutCandidateProvider _candidates;
     LanguageDictionaries _langDicts;
     IReadOnlyList<Abbreviation> _abbreviations;
     bool _fixCapsLock;
@@ -12,11 +13,13 @@ sealed class AutocorrectEngine
     public AutocorrectEngine(
         LanguageDictionaries langDicts,
         ITextInjector injector,
+        ILayoutCandidateProvider candidates,
         IReadOnlyList<Abbreviation> abbreviations,
         bool fixCapsLock)
     {
         _langDicts      = langDicts;
         _injector       = injector;
+        _candidates     = candidates;
         _abbreviations  = abbreviations;
         _fixCapsLock    = fixCapsLock;
     }
@@ -40,7 +43,7 @@ sealed class AutocorrectEngine
             replacement = PreserveCase(word, expansion);
         else if (_fixCapsLock && CapsLockCorrector.TryFix(word, _langDicts) is { } capsFixed)
             replacement = capsFixed; // already correctly cased
-        else if (LayoutAutoCorrector.TryCorrect(word, _langDicts) is { } layoutFixed)
+        else if (LayoutAutoCorrector.TryCorrect(word, _candidates.GetAllCandidates(word), _langDicts) is { } layoutFixed)
             replacement = PreserveCase(word, layoutFixed);
 
         if (replacement is null) return false;

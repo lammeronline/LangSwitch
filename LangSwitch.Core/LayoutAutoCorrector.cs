@@ -6,11 +6,11 @@ public static class LayoutAutoCorrector
     /// If the word looks like it was typed on the wrong layout, returns the corrected
     /// version. Returns null when no confident correction can be made.
     /// </summary>
-    public static string? TryCorrect(string word, LanguageDictionaries dicts)
+    public static string? TryCorrect(string word, IEnumerable<(string Word, string Lang)> candidatesSource, LanguageDictionaries dicts)
     {
         if (word.Length < 2) return null;
 
-        var candidates = LayoutConverter.GetAllCandidates(word).ToList();
+        var candidates = candidatesSource.ToList();
         if (candidates.Count == 0) return null;
 
         bool originalIsKnown = dicts.ContainsAny(word);
