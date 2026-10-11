@@ -40,7 +40,11 @@ sealed class AutoPunctuator
 
         var keyState = new byte[256];
         GetKeyboardState(keyState);
-        if ((keyState[(int)Keys.ControlKey] & 0x80) != 0) { Reset(); return false; }
+        // See WordTracker.Feed for why AltGr (reported as synthetic Left-Ctrl+Right-Alt)
+        // must not be treated as a real Ctrl combo here.
+        bool ctrlDown = (keyState[(int)Keys.ControlKey] & 0x80) != 0;
+        bool altGr    = (keyState[(int)Keys.RMenu] & 0x80) != 0;
+        if (ctrlDown && !altGr) { Reset(); return false; }
 
         if (e.Key == Keys.Space)
         {

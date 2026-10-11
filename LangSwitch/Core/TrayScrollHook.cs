@@ -54,6 +54,8 @@ sealed class TrayScrollHook : IDisposable
         _proc = Callback;
         using var m = Process.GetCurrentProcess().MainModule!;
         _hook = SetWindowsHookEx(WH_MOUSE_LL, _proc, GetModuleHandle(m.ModuleName!), 0);
+        if (_hook == IntPtr.Zero)
+            AppLog.Info("TrayScrollHook: SetWindowsHookEx failed — scroll-to-switch-layout will not work.");
     }
 
     IntPtr Callback(int code, IntPtr wp, IntPtr lp)

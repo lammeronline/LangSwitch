@@ -32,7 +32,7 @@ sealed class WordTracker
                 if (_buf.Length > 0) _buf.Length--;
                 return;
 
-            case Keys.Escape or Keys.Delete
+            case Keys.Escape or Keys.Delete or Keys.Tab
               or Keys.Left or Keys.Right or Keys.Up or Keys.Down
               or Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown:
                 _buf.Clear();
@@ -42,8 +42,13 @@ sealed class WordTracker
         var keyState = new byte[256];
         GetKeyboardState(keyState);
 
-        // Ctrl+anything resets the word (copy, paste, undo, etc.)
-        if ((keyState[(int)Keys.ControlKey] & 0x80) != 0) { _buf.Clear(); return; }
+        // Ctrl+anything resets the word (copy, paste, undo, etc.) — but AltGr (used to type
+        // @/€/other symbols on many non-US layouts) is reported by Windows as a synthetic
+        // Left-Ctrl+Right-Alt chord, so checking Ctrl alone would wrongly discard the
+        // in-progress word on every AltGr keystroke. Only reset for a "real" Ctrl combo.
+        bool ctrlDown = (keyState[(int)Keys.ControlKey] & 0x80) != 0;
+        bool altGr    = (keyState[(int)Keys.RMenu] & 0x80) != 0;
+        if (ctrlDown && !altGr) { _buf.Clear(); return; }
 
         var sb  = new StringBuilder(4);
         int res = ToUnicodeEx((uint)e.Key, e.ScanCode, keyState, sb, 4, 0, ForegroundLayout());

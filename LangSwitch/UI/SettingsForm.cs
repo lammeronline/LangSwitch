@@ -1057,8 +1057,9 @@ sealed class SettingsForm : Form
         var origText = _dictDlBtn.Text;
         try
         {
-            var progress = new Progress<string>(msg => _dictDlBtn.Text = msg);
+            var progress = new Progress<string>(msg => { if (!IsDisposed) _dictDlBtn.Text = msg; });
             int count = await WordListDownloader.DownloadAsync(lang, url, progress);
+            if (IsDisposed) return; // dialog was closed while the download was in flight
             _langDicts.Reload(_dicts);
             RefreshDictStatus(dict);
             MessageBox.Show(string.Format(T("Dictionaries.DownloadSuccess"), count.ToString("N0"), lang.ToUpperInvariant()),
@@ -1076,8 +1077,11 @@ sealed class SettingsForm : Form
         }
         finally
         {
-            _dictDlBtn.Text    = origText;
-            _dictDlBtn.Enabled = true;
+            if (!IsDisposed)
+            {
+                _dictDlBtn.Text    = origText;
+                _dictDlBtn.Enabled = true;
+            }
         }
     }
 

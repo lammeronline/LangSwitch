@@ -144,7 +144,14 @@ sealed class TrayApplicationContext : ApplicationContext
 
     void OnKeyDown(object? sender, HookKeyEventArgs e)
     {
-        _lastExternalWindow = LayoutManager.CurrentForegroundWindow;
+        // Keep the "last external window" invariant honest — without this check, typing
+        // into our own Settings dialog (the keyboard hook is global and fires regardless of
+        // which process has focus) would overwrite it with our own window, so a scroll/click
+        // on the tray right after could switch the keyboard layout of the Settings dialog
+        // instead of whatever app the user was really working in.
+        var fg = LayoutManager.CurrentForegroundWindow;
+        if (fg != IntPtr.Zero && !LayoutManager.BelongsToCurrentProcess(fg))
+            _lastExternalWindow = fg;
 
         // Never buffer, autocorrect, or manually convert text in a password field.
         if (PasswordFieldDetector.IsFocusedFieldPassword())
@@ -602,9 +609,13 @@ sealed class TrayApplicationContext : ApplicationContext
     /// </summary>
     void DownloadMissingDictionaries()
     {
+        // Must check the *source*, not WordCount == 0: en/ru/uk always have a non-empty
+        // built-in fallback word list (~25-31 words), so WordCount alone never reads 0 for
+        // them and a real download would never fire for exactly the three flagship
+        // languages this is most important for.
         var missing = _dicts.Where(d =>
             d.Enabled && !string.IsNullOrEmpty(d.Lang) && !string.IsNullOrEmpty(d.Url) &&
-            _langDicts.WordCount(d.Lang) == 0).ToList();
+            _langDicts.SourceOf(d.Lang) is DictionarySource.Builtin or DictionarySource.None).ToList();
         if (missing.Count == 0) return;
 
         SynchronizationContext.Current!.Post(async _ =>
@@ -629,10 +640,8 @@ sealed class TrayApplicationContext : ApplicationContext
     void Quit()
     {
         StatsStore.Save(_stats);
-        _tray.Visible = false;
-        _monitor.Dispose();
-        _popup.Dispose();
-        Application.Exit();
+        _tray.Visible = false; // hide immediately; full cleanup happens in Dispose(bool)
+        Application.Exit();    // Application.Run disposes this ApplicationContext once the loop ends
     }
 
     protected override void Dispose(bool disposing)

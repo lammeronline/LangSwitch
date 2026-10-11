@@ -32,6 +32,8 @@ sealed class KeyboardHook : IDisposable
         _proc = Callback;
         using var m = Process.GetCurrentProcess().MainModule!;
         _hook = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(m.ModuleName!), 0);
+        if (_hook == IntPtr.Zero)
+            AppLog.Info("KeyboardHook: SetWindowsHookEx failed — autocorrect will not receive keystrokes.");
     }
 
     IntPtr Callback(int code, IntPtr wp, IntPtr lp)
