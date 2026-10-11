@@ -65,4 +65,34 @@ public class LanguageDictionariesHunspellTests : IDisposable
         var dicts = new LanguageDictionaries(Dicts((Lang, true)));
         Assert.True(dicts.Contains(Lang, "Book"));
     }
+
+    [Fact]
+    public void SourceOf_HunspellDictionary_ReportsHunspell()
+    {
+        var dicts = new LanguageDictionaries(Dicts((Lang, true)));
+        Assert.Equal(DictionarySource.Hunspell, dicts.SourceOf(Lang));
+    }
+}
+
+/// <summary>Exercises the flat-list fallback (downloaded .txt, no Hunspell pair) source reporting.</summary>
+public class LanguageDictionariesFlatListTests : IDisposable
+{
+    const string Lang = "zz-flat";
+    readonly string _txtPath = Path.Combine(LanguageDictionaries.WordListDir, Lang + ".txt");
+
+    public LanguageDictionariesFlatListTests()
+    {
+        Directory.CreateDirectory(LanguageDictionaries.WordListDir);
+        File.WriteAllText(_txtPath, "hello 100\nworld 50\n");
+    }
+
+    public void Dispose() => File.Delete(_txtPath);
+
+    [Fact]
+    public void SourceOf_FlatListDictionary_ReportsFrequencyList()
+    {
+        var dicts = new LanguageDictionaries([new UserDictionary { Name = Lang, Lang = Lang, Enabled = true }]);
+        Assert.Equal(DictionarySource.FrequencyList, dicts.SourceOf(Lang));
+        Assert.True(dicts.Contains(Lang, "hello"));
+    }
 }

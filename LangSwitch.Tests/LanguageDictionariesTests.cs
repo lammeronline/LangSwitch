@@ -64,4 +64,25 @@ public class LanguageDictionariesTests
         var best = dicts.ChooseBest("original", candidates);
         Assert.Equal("original", best);
     }
+
+    [Fact]
+    public void SourceOf_BuiltinFallbackLanguage_ReportsBuiltin()
+    {
+        var dicts = new LanguageDictionaries(Dicts(("en", true)));
+        Assert.Equal(DictionarySource.Builtin, dicts.SourceOf("en"));
+    }
+
+    [Fact]
+    public void SourceOf_UnknownLanguage_ReportsNone()
+    {
+        var dicts = new LanguageDictionaries(Dicts(("xx", true)));
+        Assert.Equal(DictionarySource.None, dicts.SourceOf("xx"));
+    }
+
+    [Fact]
+    public void SourceOf_DisabledLanguage_ReportsNone()
+    {
+        var dicts = new LanguageDictionaries(Dicts(("en", false)));
+        Assert.Equal(DictionarySource.None, dicts.SourceOf("en"));
+    }
 }

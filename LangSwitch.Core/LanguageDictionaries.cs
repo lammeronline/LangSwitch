@@ -3,6 +3,19 @@ using WeCantSpell.Hunspell;
 
 namespace LangSwitch.Core;
 
+/// <summary>Which backing store a language's word knowledge is currently loaded from.</summary>
+public enum DictionarySource
+{
+    /// <summary>Nothing loaded — language has no match in any store.</summary>
+    None,
+    /// <summary>Tiny hardcoded word set (en/ru/uk only), used before anything is downloaded.</summary>
+    Builtin,
+    /// <summary>Downloaded flat top-50k word list — no inflection awareness.</summary>
+    FrequencyList,
+    /// <summary>Downloaded Hunspell stem list + affix rules — recognizes inflected forms.</summary>
+    Hunspell,
+}
+
 /// <summary>
 /// Holds per-language word knowledge used to decide which layout a typed word belongs to.
 /// Languages loaded are driven entirely by the enabled <see cref="UserDictionary"/> entries
@@ -21,6 +34,7 @@ public sealed class LanguageDictionaries
     Dictionary<string, WordList> _hunspell = new(StringComparer.OrdinalIgnoreCase);
     Dictionary<string, HashSet<string>> _fallback = new(StringComparer.OrdinalIgnoreCase);
     Dictionary<string, int> _stemCounts = new(StringComparer.OrdinalIgnoreCase);
+    Dictionary<string, DictionarySource> _sources = new(StringComparer.OrdinalIgnoreCase);
 
     public LanguageDictionaries(IReadOnlyList<UserDictionary> dicts) => Reload(dicts);
 
@@ -29,6 +43,7 @@ public sealed class LanguageDictionaries
         var hunspell = new Dictionary<string, WordList>(StringComparer.OrdinalIgnoreCase);
         var fallback = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         var stemCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var sources = new Dictionary<string, DictionarySource>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var dict in dicts)
         {
@@ -48,6 +63,7 @@ public sealed class LanguageDictionaries
                     using var affStream = File.OpenRead(affPath);
                     hunspell[lang] = WordList.CreateFromStreams(dicStream, affStream);
                     stemCounts[lang] = ReadStemCount(dicBytes);
+                    sources[lang] = DictionarySource.Hunspell;
                     continue;
                 }
                 catch (Exception ex)
@@ -66,6 +82,7 @@ public sealed class LanguageDictionaries
                     var w = Normalize(line.Split(' ')[0]); // handle "word count" format
                     if (w.Length > 0) set.Add(w);
                 }
+                sources[lang] = DictionarySource.FrequencyList;
             }
             else
             {
@@ -74,6 +91,7 @@ public sealed class LanguageDictionaries
                     var n = Normalize(w);
                     if (n.Length > 0) set.Add(n);
                 }
+                sources[lang] = set.Count > 0 ? DictionarySource.Builtin : DictionarySource.None;
             }
             fallback[lang] = set;
             stemCounts[lang] = set.Count;
@@ -82,7 +100,12 @@ public sealed class LanguageDictionaries
         _hunspell = hunspell;
         _fallback = fallback;
         _stemCounts = stemCounts;
+        _sources = sources;
     }
+
+    /// <summary>Where a language's word knowledge currently comes from — for the Settings UI.</summary>
+    public DictionarySource SourceOf(string lang) =>
+        _sources.GetValueOrDefault(lang.Trim().ToLowerInvariant(), DictionarySource.None);
 
     public bool Contains(string lang, string word) =>
         _hunspell.TryGetValue(lang, out var wl)

@@ -66,6 +66,7 @@ sealed class SettingsForm : Form
     TextBox        _dictUrlBox   = null!;
     Label          _dictStatus   = null!;
     Button         _dictDlBtn    = null!;
+    Button         _dictImportBtn = null!;
     bool           _suppressDict;
 
     public SettingsForm(AppSettings settings, List<UserDictionary> dicts, LanguageDictionaries langDicts,
@@ -884,7 +885,7 @@ sealed class SettingsForm : Form
     {
         var panel = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 3,
+            Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 4,
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Padding = new Padding(0, 8, 0, 8),
         };
@@ -892,6 +893,7 @@ sealed class SettingsForm : Form
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48));
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -906,6 +908,9 @@ sealed class SettingsForm : Form
         _dictDlBtn   = new Button  { Text = T("Dictionaries.Download"), Dock = DockStyle.Fill, Height = 24, Margin = new Padding(0, 2, 0, 4) };
         _dictDlBtn.Click += async (_, _) => await DownloadSelectedDict();
 
+        _dictImportBtn = new Button { Text = T("Dictionaries.ImportFromFile"), AutoSize = true, Height = 24, Margin = new Padding(0, 2, 0, 4), Anchor = AnchorStyles.Left };
+        _dictImportBtn.Click += (_, _) => ImportSelectedDict();
+
         _dictStatus = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
 
         panel.Controls.Add(lblName,      0, 0);
@@ -919,8 +924,11 @@ sealed class SettingsForm : Form
         panel.SetColumnSpan(_dictDlBtn, 2);
         panel.Controls.Add(_dictDlBtn, 3, 1);
 
+        panel.SetColumnSpan(_dictImportBtn, 4);
+        panel.Controls.Add(_dictImportBtn, 0, 2);
+
         panel.SetColumnSpan(_dictStatus, 4);
-        panel.Controls.Add(_dictStatus, 0, 2);
+        panel.Controls.Add(_dictStatus, 0, 3);
 
         _dictNameBox.TextChanged += (_, _) =>
         {
@@ -968,6 +976,7 @@ sealed class SettingsForm : Form
         _dictLangBox.Enabled = hasSel;
         _dictUrlBox.Enabled  = hasSel;
         _dictDlBtn.Enabled   = hasSel;
+        _dictImportBtn.Enabled = hasSel;
 
         _suppressDict = true;
         _dictNameBox.Text = dict?.Name ?? "";
@@ -981,8 +990,16 @@ sealed class SettingsForm : Form
 
     void RefreshDictStatus(UserDictionary dict)
     {
-        var count = string.IsNullOrEmpty(dict.Lang) ? 0 : _langDicts.WordCount(dict.Lang);
-        _dictStatus.Text      = count > 0 ? string.Format(T("Dictionaries.WordsLoaded"), count.ToString("N0")) : T("Dictionaries.NotDownloaded");
+        var count  = string.IsNullOrEmpty(dict.Lang) ? 0 : _langDicts.WordCount(dict.Lang);
+        var source = string.IsNullOrEmpty(dict.Lang) ? DictionarySource.None : _langDicts.SourceOf(dict.Lang);
+
+        _dictStatus.Text = source switch
+        {
+            DictionarySource.Hunspell      => string.Format(T("Dictionaries.WordsLoaded"), count.ToString("N0"), T("Dictionaries.SourceHunspell")),
+            DictionarySource.FrequencyList => string.Format(T("Dictionaries.WordsLoaded"), count.ToString("N0"), T("Dictionaries.SourceFrequencyList")),
+            DictionarySource.Builtin       => string.Format(T("Dictionaries.WordsLoaded"), count.ToString("N0"), T("Dictionaries.SourceBuiltin")),
+            _                              => T("Dictionaries.NotDownloaded"),
+        };
         _dictStatus.ForeColor = count > 0 ? Color.SeaGreen : SystemColors.GrayText;
     }
 
@@ -1058,6 +1075,67 @@ sealed class SettingsForm : Form
         {
             _dictDlBtn.Text    = origText;
             _dictDlBtn.Enabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Lets the user pick a dictionary file from disk — a Hunspell .dic (with a matching .aff
+    /// expected next to it) or a flat .txt word list — and installs it under WordLists/{lang}
+    /// as if it had been downloaded, with no internet connection required.
+    /// </summary>
+    void ImportSelectedDict()
+    {
+        var dict = SelectedDict();
+        if (dict is null) return;
+
+        var lang = _dictLangBox.Text.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(lang))
+        {
+            MessageBox.Show(T("Dictionaries.EnterLangCode"), T("Common.AppName"),
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        using var ofd = new OpenFileDialog
+        {
+            Title  = T("Dictionaries.ImportDialogTitle"),
+            Filter = T("Dictionaries.ImportFilter"),
+        };
+        if (ofd.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            Directory.CreateDirectory(LanguageDictionaries.WordListDir);
+            var ext = Path.GetExtension(ofd.FileName).ToLowerInvariant();
+
+            if (ext == ".dic")
+            {
+                var affSource = Path.ChangeExtension(ofd.FileName, ".aff");
+                if (!File.Exists(affSource))
+                {
+                    MessageBox.Show(string.Format(T("Dictionaries.ImportMissingAff"), Path.GetFileName(ofd.FileName)),
+                        T("Common.AppName"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                File.Copy(ofd.FileName, Path.Combine(LanguageDictionaries.WordListDir, lang + ".dic"), overwrite: true);
+                File.Copy(affSource,    Path.Combine(LanguageDictionaries.WordListDir, lang + ".aff"), overwrite: true);
+            }
+            else
+            {
+                File.Copy(ofd.FileName, Path.Combine(LanguageDictionaries.WordListDir, lang + ".txt"), overwrite: true);
+            }
+
+            _langDicts.Reload(_dicts);
+            RefreshDictStatus(dict);
+
+            var count = _langDicts.WordCount(lang);
+            MessageBox.Show(string.Format(T("Dictionaries.ImportSuccess"), count.ToString("N0"), lang.ToUpperInvariant(), Path.GetFileName(ofd.FileName)),
+                T("Common.AppName"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(string.Format(T("Dictionaries.GenericError"), ex.Message), T("Common.AppName"),
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

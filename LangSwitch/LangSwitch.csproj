@@ -32,4 +32,24 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <!--
+    Bundled offline dictionaries for the flagship languages (en/ru/uk), so autocorrect works
+    out of the box with no internet connection — everything else still downloads on demand
+    when a matching keyboard layout is installed. Deliberately a Copy task, not a Content
+    item: a Content item with CopyToOutputDirectory flows transitively to any project that
+    references this one (including LangSwitch.Tests), which would pollute test runs with
+    multi-MB real dictionaries instead of the tiny deterministic fixtures tests expect.
+  -->
+  <ItemGroup>
+    <BundledWordLists Include="WordLists\*.dic;WordLists\*.aff" />
+  </ItemGroup>
+
+  <Target Name="CopyBundledWordListsToOutput" AfterTargets="Build">
+    <Copy SourceFiles="@(BundledWordLists)" DestinationFolder="$(OutDir)WordLists" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyBundledWordListsToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="@(BundledWordLists)" DestinationFolder="$(PublishDir)WordLists" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

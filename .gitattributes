@@ -6,3 +6,5 @@
 *.json text eol=crlf
 *.gitignore text eol=crlf
 *.png binary
+*.dic binary
+*.aff binary
