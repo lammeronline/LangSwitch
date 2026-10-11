@@ -1,7 +1,9 @@
 # LangSwitch
 
 A lightweight Windows tray utility that fixes text typed in the wrong keyboard
-layout (EN ⇄ RU ⇄ UK) — a PuntoSwitcher-style layout autocorrector for .NET 8.
+layout — a PuntoSwitcher-style layout autocorrector for .NET 8. Works with
+any keyboard layout installed on your system, not just a fixed set of
+languages.
 
 ## Features
 
@@ -23,10 +25,16 @@ layout (EN ⇄ RU ⇄ UK) — a PuntoSwitcher-style layout autocorrector for .NE
   it changes; left-click the tray icon for a layout picker, right-click for
   settings.
 - **Keyboard layout management** — install/remove Windows keyboard layouts
-  directly from the Settings window.
-- **Configurable dictionaries** — per-language word lists (download
-  frequency word lists, or add your own) used to decide whether a word looks
-  "right" in a given language.
+  directly from the Settings window; a dictionary is added or removed to
+  match automatically, no fixed language list anywhere.
+- **Hunspell-backed dictionaries** — word knowledge comes from Hunspell
+  stem+affix dictionaries where available (recognizes inflected forms, not
+  just a flat word list), falling back to a frequency word list for
+  languages Hunspell doesn't cover. English, Russian and Ukrainian ship
+  bundled for offline use out of the box; every other language downloads
+  automatically the moment its keyboard layout is installed. A dictionary
+  can also be imported manually from a local file with no internet
+  connection at all.
 
 ## Download
 
@@ -56,18 +64,24 @@ dotnet publish LangSwitch/LangSwitch.csproj -c Release -r win-x64 --self-contain
 ```
 LangSwitch.sln
   LangSwitch/         WinForms app — tray UI, settings, Win32 interop (hook,
-                       layout switching, text injection)
+                       layout switching, text injection), bundled offline
+                       dictionaries (WordLists/)
   LangSwitch.Core/     Pure logic, no Win32/WinForms dependency — layout
-                       conversion tables, dictionaries, autocorrect decision
-                       logic, abbreviation/caps-lock correctors, JSON stores
+                       conversion, Hunspell/frequency-list dictionaries,
+                       autocorrect decision logic, abbreviation/caps-lock
+                       correctors, JSON stores
   LangSwitch.Tests/    xUnit tests for LangSwitch.Core and the autocorrect
                        orchestration
 ```
 
-Settings, dictionaries, abbreviations, and word lists are stored as JSON/text
-files next to the executable at runtime (`settings.json`,
-`dictionaries.json`, `abbreviations.json`, `WordLists/`), not in the
-repository.
+Settings, dictionaries, and abbreviations are stored as JSON files next to
+the executable at runtime (`settings.json`, `dictionaries.json`,
+`abbreviations.json`) and are not part of the repository. The en/ru/uk
+dictionary files under `LangSwitch/WordLists/` are the exception — those
+ship in the repo and get copied next to the executable at build/publish
+time, so the app works offline out of the box; any other language's
+dictionary is downloaded (or imported manually) at runtime into the same
+`WordLists/` folder next to the executable.
 
 ## Contributing a translation
 
