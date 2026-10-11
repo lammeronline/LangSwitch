@@ -7,6 +7,10 @@
   "Common.Add": "+ Додати",
   "Common.Remove": "− Видалити",
   "Common.AppName": "LangSwitch",
+  "Common.AlreadyRunning": "LangSwitch вже запущено — перевірте системний трей.",
+  "About.Title": "Про LangSwitch",
+  "About.Tagline": "Виправляє текст, набраний не в тій розкладці клавіатури.",
+  "About.PortalLink": "Проєкт LammerOnline — lammeronline.com",
 
   "Settings.Title": "LangSwitch — Налаштування",
 
@@ -99,6 +103,7 @@
   "Menu.Autocorrect": "Автовиправлення",
   "Menu.ConvertWord": "Конвертувати слово",
   "Menu.Settings": "Налаштування…",
+  "Menu.About": "Про LangSwitch…",
   "Menu.Exit": "Вихід",
 
   "Tray.AutocorrectOnSuffix": " (автовиправлення увімк.)",

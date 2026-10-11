@@ -11,6 +11,12 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <ApplicationIcon>Assets\Icon\app.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>LangSwitch</Product>
+    <Company>LammerOnline</Company>
   </PropertyGroup>
 
   <ItemGroup>

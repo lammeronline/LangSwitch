@@ -7,6 +7,10 @@
   "Common.Add": "+ Add",
   "Common.Remove": "− Remove",
   "Common.AppName": "LangSwitch",
+  "Common.AlreadyRunning": "LangSwitch is already running — check your system tray.",
+  "About.Title": "About LangSwitch",
+  "About.Tagline": "Fixes text typed in the wrong keyboard layout.",
+  "About.PortalLink": "A LammerOnline project — lammeronline.com",
 
   "Settings.Title": "LangSwitch — Settings",
 
@@ -99,6 +103,7 @@
   "Menu.Autocorrect": "Autocorrect",
   "Menu.ConvertWord": "Convert word",
   "Menu.Settings": "Settings…",
+  "Menu.About": "About LangSwitch…",
   "Menu.Exit": "Exit",
 
   "Tray.AutocorrectOnSuffix": " (autocorrect on)",

@@ -383,6 +383,7 @@ sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add($"{T("Menu.ConvertWord")}{hotKeyLabel}", null, (_, _) => ScheduleConvert());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(T("Menu.Settings"), null, (_, _) => OpenSettings());
+        menu.Items.Add(T("Menu.About"), null, (_, _) => { using var about = new AboutForm(); about.ShowDialog(); });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(T("Menu.Exit"), null, (_, _) => Quit());
         menu.Opening += (_, _) => MenuTheme.Apply(menu);

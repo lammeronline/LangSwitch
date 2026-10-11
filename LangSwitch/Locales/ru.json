@@ -7,6 +7,10 @@
   "Common.Add": "+ Добавить",
   "Common.Remove": "− Удалить",
   "Common.AppName": "LangSwitch",
+  "Common.AlreadyRunning": "LangSwitch уже запущен — посмотрите в системный трей.",
+  "About.Title": "О программе LangSwitch",
+  "About.Tagline": "Исправляет текст, набранный не в той раскладке клавиатуры.",
+  "About.PortalLink": "Проект LammerOnline — lammeronline.com",
 
   "Settings.Title": "LangSwitch — Настройки",
 
@@ -99,6 +103,7 @@
   "Menu.Autocorrect": "Автокоррекция",
   "Menu.ConvertWord": "Конвертировать слово",
   "Menu.Settings": "Настройки…",
+  "Menu.About": "О программе LangSwitch…",
   "Menu.Exit": "Выход",
 
   "Tray.AutocorrectOnSuffix": " (автокоррекция вкл.)",
