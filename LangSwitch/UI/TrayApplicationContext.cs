@@ -17,6 +17,9 @@ sealed class TrayApplicationContext : ApplicationContext
     readonly LanguageDictionaries _langDicts;
     List<UserDictionary> _dicts;
     List<Abbreviation> _abbreviations;
+    readonly Dictionary<string, int> _undoCounts;
+    readonly Stats _stats;
+    readonly AutoPunctuator _punctuator = new();
     AppSettings _settings;
     Icon? _currentIcon;
     ToolStripMenuItem _autocorrectItem = null!;
@@ -33,9 +36,12 @@ sealed class TrayApplicationContext : ApplicationContext
             .Select(l => l.Culture.TwoLetterISOLanguageName).Distinct();
         _dicts         = DictionaryStore.Load(seedLangs);
         _abbreviations = AbbreviationStore.Load();
+        _undoCounts    = UndoLearningStore.Load();
+        _stats         = StatsStore.Load();
         _langDicts     = new LanguageDictionaries(_dicts);
         _candidates    = new LayoutCandidateGenerator(new WinLayoutCharMapSource());
-        _engine        = new AutocorrectEngine(_langDicts, new WinTextInjector(), _candidates, _abbreviations, _settings.FixCapsLock);
+        _engine        = new AutocorrectEngine(_langDicts, new WinTextInjector(), _candidates, _abbreviations,
+            _settings.FixCapsLock, NeverCorrectSet());
 
         _popup   = new FlagPopupForm(_settings);
         _monitor = new LayoutMonitor();
@@ -60,6 +66,14 @@ sealed class TrayApplicationContext : ApplicationContext
 
     void OnKeyDown(object? sender, HookKeyEventArgs e)
     {
+        // Never buffer, autocorrect, or manually convert text in a password field.
+        if (PasswordFieldDetector.IsFocusedFieldPassword())
+        {
+            _pendingUndo = null;
+            _tracker.Clear();
+            return;
+        }
+
         if (_settings.ConvertHotKey != Keys.None)
         {
             var baseKey = _settings.ConvertHotKey & Keys.KeyCode;
@@ -73,6 +87,9 @@ sealed class TrayApplicationContext : ApplicationContext
             }
         }
 
+        if (_settings.AutoPunctuation && !IsExcludedApp() && _punctuator.TryHandle(e))
+            return;
+
         if (e.Key == Keys.Back && _pendingUndo is { } undo)
         {
             e.Handled = true;
@@ -81,11 +98,25 @@ sealed class TrayApplicationContext : ApplicationContext
             string restore   = undo.Original + (undo.Boundary != '\0' ? undo.Boundary.ToString() : "");
             TextInjector.Replace(deleteCount, restore);
             _tracker.Clear();
+            RecordUndo(undo.Original);
             return;
         }
         _pendingUndo = null; // any other key ends the undo window
 
         _tracker.Feed(e);
+    }
+
+    HashSet<string> NeverCorrectSet() =>
+        new(_undoCounts.Where(kv => kv.Value >= _settings.UndoLearnThreshold).Select(kv => kv.Key),
+            StringComparer.OrdinalIgnoreCase);
+
+    void RecordUndo(string original)
+    {
+        var key = original.ToLowerInvariant();
+        _undoCounts[key] = _undoCounts.GetValueOrDefault(key) + 1;
+        UndoLearningStore.Save(_undoCounts);
+        if (_undoCounts[key] >= _settings.UndoLearnThreshold)
+            _engine.ReloadNeverCorrect(NeverCorrectSet());
     }
 
     void ScheduleConvert()
@@ -211,6 +242,7 @@ sealed class TrayApplicationContext : ApplicationContext
         await ClipSetAsync(prevClip);
 
         _tracker.Clear();
+        _stats.ManualConversions++;
         return true;
     }
 
@@ -260,6 +292,7 @@ sealed class TrayApplicationContext : ApplicationContext
         await Task.Delay(50);
 
         await ClipSetAsync(prevClip);
+        _stats.ManualConversions++;
     }
 
     void OnWordReady(object? sender, WordReadyEventArgs e)
@@ -273,6 +306,8 @@ sealed class TrayApplicationContext : ApplicationContext
         {
             _pendingUndo = new PendingUndo(e.Word, replacement!, e.Boundary);
             _lastWord = string.Empty;
+            _stats.WordsCorrected++;
+            _stats.CharactersFixed += e.Word.Length;
             return;
         }
 
@@ -312,6 +347,7 @@ sealed class TrayApplicationContext : ApplicationContext
         {
             _settings.AutocorrectEnabled = _autocorrectItem.Checked;
             SettingsStore.Save(_settings);
+            RefreshTrayIcon(_monitor.Current);
         };
 
         var menu = new ContextMenuStrip();
@@ -384,33 +420,44 @@ sealed class TrayApplicationContext : ApplicationContext
         layout ??= WindowsLayoutDetector.GetForegroundLayout();
         if (layout is null) return;
 
-        var icon = TrayIconFactory.Create(layout);
+        var icon = TrayIconFactory.Create(layout, _settings.AutocorrectEnabled);
         _tray.Icon = icon;
-        _tray.Text = $"LangSwitch — {layout.DisplayName}";
+        _tray.Text = $"LangSwitch — {layout.DisplayName}"
+            + (_settings.AutocorrectEnabled ? " (autocorrect on)" : "");
         _currentIcon?.Dispose();
         _currentIcon = icon;
     }
 
     void OpenSettings()
     {
-        using var form = new SettingsForm(_settings, _dicts, _langDicts, _abbreviations);
+        using var form = new SettingsForm(_settings, _dicts, _langDicts, _abbreviations, _stats, _undoCounts, ResetUndoLearning);
         if (form.ShowDialog() == DialogResult.OK)
         {
             SettingsStore.Save(_settings);
             DictionaryStore.Save(_dicts);
             AbbreviationStore.Save(_abbreviations);
+            StatsStore.Save(_stats);
             _langDicts.Reload(_dicts);
             _engine.ReloadWordLists(_langDicts);
             _engine.ReloadAbbreviations(_abbreviations);
             _engine.SetFixCapsLock(_settings.FixCapsLock);
+            _engine.ReloadNeverCorrect(NeverCorrectSet());
             _popup.ApplySettings(_settings);
             RefreshTrayIcon(_monitor.Current);
             _autocorrectItem.Checked = _settings.AutocorrectEnabled;
         }
     }
 
+    void ResetUndoLearning()
+    {
+        _undoCounts.Clear();
+        UndoLearningStore.Save(_undoCounts);
+        _engine.ReloadNeverCorrect([]);
+    }
+
     void Quit()
     {
+        StatsStore.Save(_stats);
         _tray.Visible = false;
         _monitor.Dispose();
         _popup.Dispose();

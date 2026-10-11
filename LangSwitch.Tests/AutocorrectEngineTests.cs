@@ -38,8 +38,8 @@ public class AutocorrectEngineTests
     static AutocorrectEngine Engine(
         LanguageDictionaries dicts, ITextInjector injector,
         List<Abbreviation>? abbreviations = null, bool fixCapsLock = true,
-        ILayoutCandidateProvider? candidates = null) =>
-        new(dicts, injector, candidates ?? DefaultCandidates, abbreviations ?? [], fixCapsLock);
+        ILayoutCandidateProvider? candidates = null, HashSet<string>? neverCorrect = null) =>
+        new(dicts, injector, candidates ?? DefaultCandidates, abbreviations ?? [], fixCapsLock, neverCorrect);
 
     [Fact]
     public void TryReplace_KnownWord_DoesNotInject()
@@ -141,6 +141,21 @@ public class AutocorrectEngineTests
         bool replaced = engine.TryReplace(e, out _);
 
         Assert.False(replaced);
+    }
+
+    [Fact]
+    public void TryReplace_WordInNeverCorrectSet_IsLeftAlone()
+    {
+        var injector = new FakeTextInjector();
+        var neverCorrect = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ghbdtn" };
+        var engine = Engine(Dicts("en", "ru"), injector, neverCorrect: neverCorrect);
+        var e = WordReady("ghbdtn");
+
+        bool replaced = engine.TryReplace(e, out var replacement);
+
+        Assert.False(replaced);
+        Assert.Null(replacement);
+        Assert.Empty(injector.Calls);
     }
 
     [Theory]

@@ -10,6 +10,9 @@ sealed class SettingsForm : Form
     readonly List<UserDictionary> _dicts;
     readonly List<Abbreviation> _abbreviations;
     readonly LanguageDictionaries _langDicts;
+    readonly Stats _stats;
+    readonly Dictionary<string, int> _undoCounts;
+    readonly Action _resetUndoLearning;
 
     // ── Sidebar nav ─────────────────────────────────────────────────────────
     const int NavWidth = 150;
@@ -31,9 +34,12 @@ sealed class SettingsForm : Form
     CheckBox _autocorrectBox = null!;
     CheckBox _notifyWrongLayoutBox = null!;
     CheckBox _fixCapsLockBox = null!;
+    CheckBox _autoPunctuationBox = null!;
     CheckBox _launchAtStartupBox = null!;
     TextBox  _hotkeyBox = null!;
     NumericUpDown _clipDelayBox = null!;
+    NumericUpDown _undoThresholdBox = null!;
+    Label    _learnedWordsLabel = null!;
     Keys     _capturedKey;
 
     // ── Appearance section ───────────────────────────────────────────────────
@@ -59,12 +65,16 @@ sealed class SettingsForm : Form
     Button         _dictDlBtn    = null!;
     bool           _suppressDict;
 
-    public SettingsForm(AppSettings settings, List<UserDictionary> dicts, LanguageDictionaries langDicts, List<Abbreviation> abbreviations)
+    public SettingsForm(AppSettings settings, List<UserDictionary> dicts, LanguageDictionaries langDicts,
+        List<Abbreviation> abbreviations, Stats stats, Dictionary<string, int> undoCounts, Action resetUndoLearning)
     {
-        _settings      = settings;
-        _dicts         = dicts;
-        _langDicts     = langDicts;
-        _abbreviations = abbreviations;
+        _settings          = settings;
+        _dicts             = dicts;
+        _langDicts         = langDicts;
+        _abbreviations     = abbreviations;
+        _stats             = stats;
+        _undoCounts        = undoCounts;
+        _resetUndoLearning = resetUndoLearning;
         Build();
         LoadAvailableLayouts();
         LoadDisplayValues();
@@ -145,10 +155,11 @@ sealed class SettingsForm : Form
         var btnAppearance   = MakeNavButton("Appearance");
         var btnExclusions   = MakeNavButton("Exclusions");
         var btnAbbreviations = MakeNavButton("Abbreviations");
+        var btnStatistics   = MakeNavButton("Statistics");
         var btnLanguages    = MakeNavButton("Languages");
         var btnDictionaries = MakeNavButton("Dictionaries");
 
-        var buttons = new[] { btnGeneral, btnAppearance, btnExclusions, btnAbbreviations, btnLanguages, btnDictionaries };
+        var buttons = new[] { btnGeneral, btnAppearance, btnExclusions, btnAbbreviations, btnStatistics, btnLanguages, btnDictionaries };
 
         var table = new TableLayoutPanel
         {
@@ -169,6 +180,7 @@ sealed class SettingsForm : Form
         _navEntries.Add((btnAppearance,    BuildAppearanceSection()));
         _navEntries.Add((btnExclusions,    BuildExclusionsSection()));
         _navEntries.Add((btnAbbreviations, BuildAbbreviationsSection()));
+        _navEntries.Add((btnStatistics,    BuildStatisticsSection()));
         _navEntries.Add((btnLanguages,     BuildLanguagesSection()));
         _navEntries.Add((btnDictionaries,  BuildDictionariesSection()));
 
@@ -276,8 +288,9 @@ sealed class SettingsForm : Form
         _autocorrectBox = new CheckBox { Text = "Enable autocorrect", AutoSize = true };
         _notifyWrongLayoutBox = new CheckBox { Text = "Show balloon when a word may be in the wrong layout", AutoSize = true };
         _fixCapsLockBox = new CheckBox { Text = "Fix accidental Caps Lock (hELLO → Hello)", AutoSize = true };
+        _autoPunctuationBox = new CheckBox { Text = "Auto-punctuation (double space → period, \" - \" → — )", AutoSize = true };
         _launchAtStartupBox = new CheckBox { Text = "Launch LangSwitch when Windows starts", AutoSize = true };
-        behavior.Controls.Add(VStack(_autocorrectBox, _notifyWrongLayoutBox, _fixCapsLockBox, _launchAtStartupBox));
+        behavior.Controls.Add(VStack(_autocorrectBox, _notifyWrongLayoutBox, _fixCapsLockBox, _autoPunctuationBox, _launchAtStartupBox));
 
         var hotkey = Card("Convert word hotkey");
         var hotkeyInner = new TableLayoutPanel
@@ -321,7 +334,7 @@ sealed class SettingsForm : Form
         hotkey.Controls.Add(hotkeyInner);
 
         var advanced = Card("Advanced");
-        var advInner = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, Font = RegularFont };
+        var advInner = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 2, Font = RegularFont };
         var lblDelay = new Label { Text = "Clipboard sync delay (ms):", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
         _clipDelayBox = new NumericUpDown { Width = 70, Minimum = 10, Maximum = 1000, Increment = 10, Margin = new Padding(0, 3, 8, 0) };
         var lblDelayHint = new Label
@@ -332,6 +345,13 @@ sealed class SettingsForm : Form
         advInner.Controls.Add(lblDelay, 0, 0);
         advInner.Controls.Add(_clipDelayBox, 1, 0);
         advInner.Controls.Add(lblDelayHint, 2, 0);
+
+        var lblUndo = new Label { Text = "Stop correcting a word after it's undone this many times:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 10, 8, 0) };
+        _undoThresholdBox = new NumericUpDown { Width = 70, Minimum = 2, Maximum = 10, Margin = new Padding(0, 7, 8, 0) };
+        _learnedWordsLabel = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left, Margin = new Padding(0, 10, 0, 0) };
+        advInner.Controls.Add(lblUndo, 0, 1);
+        advInner.Controls.Add(_undoThresholdBox, 1, 1);
+        advInner.Controls.Add(_learnedWordsLabel, 2, 1);
         advanced.Controls.Add(advInner);
 
         return CardStack(behavior, hotkey, advanced);
@@ -401,19 +421,29 @@ sealed class SettingsForm : Form
         addRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         addRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         _exclusionBox = new TextBox { Dock = DockStyle.Fill, PlaceholderText = "e.g. notepad.exe", Margin = new Padding(0, 1, 6, 0) };
-        var btnAddExcl = new Button { Text = "+ Add", Width = 60, Height = 24 };
-        var btnDelExcl = new Button { Text = "− Remove", Width = 72, Height = 24, Margin = new Padding(6, 0, 0, 0) };
+        var btnAddExcl  = new Button { Text = "+ Add", Width = 60, Height = 24 };
+        var btnPickExcl = new Button { Text = "Pick running app…", Width = 110, Height = 24, Margin = new Padding(6, 0, 0, 0) };
+        var btnDelExcl  = new Button { Text = "− Remove", Width = 72, Height = 24, Margin = new Padding(6, 0, 0, 0) };
 
-        void AddExclusion()
+        void AddExclusionText(string name)
         {
-            var name = _exclusionBox.Text.Trim();
             if (name.Length == 0) return;
             _settings.ExcludedApps.Add(name);
             _exclusionsList.Items.Add(name);
+        }
+        void AddExclusion()
+        {
+            AddExclusionText(_exclusionBox.Text.Trim());
             _exclusionBox.Clear();
         }
         btnAddExcl.Click += (_, _) => AddExclusion();
         _exclusionBox.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; AddExclusion(); } };
+        btnPickExcl.Click += (_, _) =>
+        {
+            using var picker = new AppPickerForm();
+            if (picker.ShowDialog(this) == DialogResult.OK && picker.SelectedProcessName is { } name)
+                AddExclusionText(name);
+        };
         btnDelExcl.Click += (_, _) =>
         {
             int idx = _exclusionsList.SelectedIndex;
@@ -423,7 +453,7 @@ sealed class SettingsForm : Form
         };
 
         var addRowButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoSize = true };
-        addRowButtons.Controls.AddRange([btnAddExcl, btnDelExcl]);
+        addRowButtons.Controls.AddRange([btnAddExcl, btnPickExcl, btnDelExcl]);
         addRow.Controls.Add(_exclusionBox, 0, 0);
         addRow.Controls.Add(addRowButtons, 1, 0);
 
@@ -562,6 +592,79 @@ sealed class SettingsForm : Form
     }
 
     Abbreviation? SelectedAbbrev() => _abbrevListBox.SelectedItem as Abbreviation;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Statistics section
+    // ═══════════════════════════════════════════════════════════════════════
+
+    Label _statWords = null!, _statChars = null!, _statManual = null!, _statTime = null!, _statLearned = null!;
+
+    Panel BuildStatisticsSection()
+    {
+        var card = Card("Local statistics");
+        var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        (Label Key, Label Value) Row(string label)
+        {
+            var key = new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 4, 8, 0) };
+            var val = new Label { AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 4, 0, 0), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            grid.Controls.Add(key); grid.Controls.Add(val);
+            return (key, val);
+        }
+
+        (_, _statWords)   = Row("Words corrected:");
+        (_, _statChars)   = Row("Characters fixed:");
+        (_, _statManual)  = Row("Manual conversions:");
+        (_, _statTime)    = Row("Estimated time saved:");
+        (_, _statLearned) = Row("Words excluded via undo-learning:");
+
+        var hint = new Label
+        {
+            Text = "Stored locally only — nothing is sent anywhere.",
+            AutoSize = true, ForeColor = SystemColors.GrayText, Dock = DockStyle.Top, Margin = new Padding(0, 10, 0, 10),
+        };
+
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+        var btnResetStats   = new Button { Text = "Reset statistics", Width = 110, Height = 24 };
+        var btnResetLearned = new Button { Text = "Reset learned words", Width = 130, Height = 24, Margin = new Padding(8, 0, 0, 0) };
+        btnResetStats.Click += (_, _) =>
+        {
+            _stats.WordsCorrected = 0;
+            _stats.CharactersFixed = 0;
+            _stats.ManualConversions = 0;
+            RefreshStats();
+        };
+        btnResetLearned.Click += (_, _) =>
+        {
+            _resetUndoLearning(); // clears the shared _undoCounts dictionary itself
+            RefreshStats();
+            RefreshLearnedWordsLabel();
+        };
+        buttons.Controls.AddRange([btnResetStats, btnResetLearned]);
+
+        var inner = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, AutoSize = true };
+        inner.Controls.Add(grid);
+        inner.Controls.Add(hint);
+        inner.Controls.Add(buttons);
+        card.Controls.Add(inner);
+
+        RefreshStats();
+        return CardStack(card);
+    }
+
+    void RefreshStats()
+    {
+        _statWords.Text  = _stats.WordsCorrected.ToString("N0");
+        _statChars.Text  = _stats.CharactersFixed.ToString("N0");
+        _statManual.Text = _stats.ManualConversions.ToString("N0");
+
+        var seconds = _stats.CharactersFixed * 0.3;
+        _statTime.Text = seconds < 60 ? $"~{seconds:N0}s" : $"~{seconds / 60:N0}m";
+
+        _statLearned.Text = _undoCounts.Count(kv => kv.Value >= _settings.UndoLearnThreshold).ToString("N0");
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // Languages section
@@ -936,8 +1039,17 @@ sealed class SettingsForm : Form
         _autocorrectBox.Checked       = _settings.AutocorrectEnabled;
         _notifyWrongLayoutBox.Checked = _settings.NotifyWrongLayout;
         _fixCapsLockBox.Checked       = _settings.FixCapsLock;
+        _autoPunctuationBox.Checked   = _settings.AutoPunctuation;
         _clipDelayBox.Value           = Math.Clamp(_settings.ClipboardDelayMs, 10, 1000);
+        _undoThresholdBox.Value       = Math.Clamp(_settings.UndoLearnThreshold, 2, 10);
         _launchAtStartupBox.Checked   = StartupManager.IsEnabled();
+        RefreshLearnedWordsLabel();
+    }
+
+    void RefreshLearnedWordsLabel()
+    {
+        int learned = _undoCounts.Count(kv => kv.Value >= _settings.UndoLearnThreshold);
+        _learnedWordsLabel.Text = $"{learned} word(s) currently excluded this way";
     }
 
     void SaveDisplayValues()
@@ -955,7 +1067,9 @@ sealed class SettingsForm : Form
         _settings.AutocorrectEnabled = _autocorrectBox.Checked;
         _settings.NotifyWrongLayout = _notifyWrongLayoutBox.Checked;
         _settings.FixCapsLock       = _fixCapsLockBox.Checked;
+        _settings.AutoPunctuation   = _autoPunctuationBox.Checked;
         _settings.ClipboardDelayMs  = (int)_clipDelayBox.Value;
+        _settings.UndoLearnThreshold = (int)_undoThresholdBox.Value;
 
         StartupManager.SetEnabled(_launchAtStartupBox.Checked);
     }

@@ -8,6 +8,8 @@ public class AppSettings
     public bool            AutocorrectEnabled  { get; set; } = true;
     public bool            NotifyWrongLayout   { get; set; } = false;
     public bool            FixCapsLock         { get; set; } = true;
+    public bool            AutoPunctuation     { get; set; } = false;
+    public int             UndoLearnThreshold  { get; set; } = 3;
     public Keys            ConvertHotKey       { get; set; } = Keys.None;
     public int             ClipboardDelayMs    { get; set; } = 20;
 

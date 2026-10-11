@@ -16,12 +16,12 @@ public static class LayoutAutoCorrector
         bool originalIsKnown = dicts.ContainsAny(word);
         if (originalIsKnown) return null; // word is already correct
 
-        // Find first candidate that exists in word lists
-        foreach (var (candidate, lang) in candidates)
-        {
-            if (dicts.Contains(lang, candidate))
-                return candidate;
-        }
+        // A candidate only wins if it's the *only* one that matches a loaded dictionary.
+        // If more than one does (e.g. the word is a plausible candidate in two installed,
+        // closely related languages — classically RU/UK), stay conservative and don't guess.
+        var matches = candidates.Where(c => dicts.Contains(c.Lang, c.Word)).ToList();
+        if (matches.Count == 1) return matches[0].Word;
+        if (matches.Count > 1) return null;
 
         // If no candidate found in lists but original is definitely wrong
         // (all chars unmapped or clearly wrong script), use ChooseBest

@@ -150,7 +150,14 @@ sealed class FlagPopupForm : Form
     void SetFlag(LayoutInfo layout)
     {
         var previous = _currentImage;
-        _currentImage = TrayIconFactory.LoadFlagBitmap(layout.FlagCode);
+
+        using var raw = TrayIconFactory.LoadFlagBitmap(layout.FlagCode);
+        int h = (int)_settings.PopupSize;
+        int w = Math.Max(1, (int)Math.Round(raw.Width * (h / (double)raw.Height)));
+        var scaled = TrayIconFactory.Scale(raw, w, h);
+        if (_settings.AutocorrectEnabled) TrayIconFactory.DrawAutoBadge(scaled, "AUTO");
+
+        _currentImage = scaled;
         _flagBox.Image = _currentImage;
         previous?.Dispose();
     }

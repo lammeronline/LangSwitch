@@ -12,11 +12,12 @@ static class TrayIconFactory
 
     const int TraySize = 32;
 
-    public static Icon Create(LayoutInfo layout)
+    public static Icon Create(LayoutInfo layout, bool autocorrectEnabled = false)
     {
         using var bitmap = LoadFlagBitmap(layout.FlagCode);
         using var scaled = Scale(bitmap, TraySize, TraySize);
         DrawBorder(scaled);
+        if (autocorrectEnabled) DrawAutoBadge(scaled);
 
         IntPtr hIcon = scaled.GetHicon();
         try
@@ -63,6 +64,30 @@ static class TrayIconFactory
         using var g = Graphics.FromImage(bmp);
         using var pen = new Pen(Color.FromArgb(80, 0, 0, 0), 1);
         g.DrawRectangle(pen, 0, 0, bmp.Width - 1, bmp.Height - 1);
+    }
+
+    /// <summary>Draws bold text centered on the image — the autocorrect-on indicator.
+    /// No background shape (a tiny badge disappears at tray-icon size) — a white fill with a
+    /// dark outline keeps it legible over any flag color underneath.</summary>
+    public static void DrawAutoBadge(Bitmap bmp, string text = "A")
+    {
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+        float fontSize = text.Length <= 1 ? bmp.Width * 0.6f : bmp.Height * 0.22f;
+        using var font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
+        var measured = g.MeasureString(text, font);
+
+        var origin = new PointF((bmp.Width - measured.Width) / 2f, (bmp.Height - measured.Height) / 2f);
+
+        using var path = new GraphicsPath();
+        path.AddString(text, font.FontFamily, (int)FontStyle.Bold, font.Size, origin, StringFormat.GenericDefault);
+
+        using var outline = new Pen(Color.FromArgb(200, 0, 0, 0), Math.Max(1.2f, fontSize * 0.1f)) { LineJoin = LineJoin.Round };
+        g.DrawPath(outline, path);
+        using var fill = new SolidBrush(Color.White);
+        g.FillPath(fill, path);
     }
 
     static Bitmap CreateFallback(string flagCode, int width, int height)

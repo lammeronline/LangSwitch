@@ -51,4 +51,15 @@ public class LayoutAutoCorrectorTests
         var result = LayoutAutoCorrector.TryCorrect("hello", [], dicts);
         Assert.Null(result);
     }
+
+    [Fact]
+    public void TryCorrect_AmbiguousAcrossTwoLanguages_ReturnsNull()
+    {
+        var dicts = Dicts("ru", "uk");
+        // Both candidates are known words in their respective dictionaries — ambiguous,
+        // stay conservative rather than guessing one.
+        var candidates = new[] { ("привет", "ru"), ("привіт", "uk") };
+        var result = LayoutAutoCorrector.TryCorrect("ghbdtn", candidates, dicts);
+        Assert.Null(result);
+    }
 }
