@@ -14,6 +14,7 @@ sealed class TrayApplicationContext : ApplicationContext
     readonly FlagPopupForm _popup;
     readonly LayoutMonitor _monitor;
     readonly KeyboardHook _hook;
+    TrayScrollHook? _scrollHook;
     readonly WordTracker _tracker;
     readonly AutocorrectEngine _engine;
     readonly ILayoutCandidateProvider _candidates;
@@ -99,8 +100,46 @@ sealed class TrayApplicationContext : ApplicationContext
         };
         _tray.MouseDown += OnTrayClick;
 
+        UpdateScrollHook();
+
         _monitor.Start();
         RefreshTrayIcon(_monitor.Current);
+    }
+
+    /// <summary>Creates or tears down the scroll-to-switch-layout hook to match the current
+    /// setting — called at startup and whenever it's toggled in Settings.</summary>
+    void UpdateScrollHook()
+    {
+        if (_scrollHook is not null)
+        {
+            _scrollHook.Scrolled -= OnTrayScrolled;
+            _scrollHook.Dispose();
+            _scrollHook = null;
+        }
+        if (_settings.ScrollToSwitchLayout)
+        {
+            _scrollHook = new TrayScrollHook(_tray);
+            _scrollHook.Scrolled += OnTrayScrolled;
+        }
+    }
+
+    void OnTrayScrolled(object? sender, int delta)
+    {
+        var layouts = WindowsLayoutDetector.GetInstalledLayouts();
+        if (layouts.Count < 2) return;
+
+        var current = _monitor.Current;
+        int index = 0;
+        for (int i = 0; i < layouts.Count; i++)
+        {
+            if (current is not null && layouts[i].Handle == current.Handle) { index = i; break; }
+        }
+
+        // Scroll up (positive delta) → previous layout; scroll down → next.
+        int next = delta > 0 ? (index - 1 + layouts.Count) % layouts.Count : (index + 1) % layouts.Count;
+
+        var targetHwnd = _lastExternalWindow != IntPtr.Zero ? _lastExternalWindow : LayoutManager.CurrentForegroundWindow;
+        LayoutManager.ActivateLayout(layouts[next], targetHwnd);
     }
 
     void OnKeyDown(object? sender, HookKeyEventArgs e)
@@ -549,6 +588,7 @@ sealed class TrayApplicationContext : ApplicationContext
 
             RefreshTrayIcon(_monitor.Current);
             _autocorrectItem.Checked = _settings.AutocorrectEnabled;
+            UpdateScrollHook();
 
             DownloadMissingDictionaries();
         }
@@ -600,6 +640,7 @@ sealed class TrayApplicationContext : ApplicationContext
         if (disposing)
         {
             _hook.Dispose();
+            _scrollHook?.Dispose();
             _tray.Dispose();
             _mainMenu.Dispose();
             _layoutPickerMenu?.Dispose();

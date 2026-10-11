@@ -36,6 +36,7 @@ sealed class SettingsForm : Form
     CheckBox _notifyWrongLayoutBox = null!;
     CheckBox _fixCapsLockBox = null!;
     CheckBox _autoPunctuationBox = null!;
+    CheckBox _scrollToSwitchBox = null!;
     CheckBox _launchAtStartupBox = null!;
     ComboBox _languageBox = null!;
     List<(string Code, string DisplayName)> _languages = [];
@@ -100,6 +101,7 @@ sealed class SettingsForm : Form
         MinimizeBox     = false;
         StartPosition   = FormStartPosition.CenterScreen;
         Font            = new Font("Segoe UI", 9f);
+        if (AppIcon.Shared is not null) Icon = AppIcon.Shared;
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -304,7 +306,8 @@ sealed class SettingsForm : Form
         _fixCapsLockBox = new CheckBox { Text = T("General.Behavior.FixCapsLock"), AutoSize = true };
         _autoPunctuationBox = new CheckBox { Text = T("General.Behavior.AutoPunctuation"), AutoSize = true };
         _launchAtStartupBox = new CheckBox { Text = T("General.Behavior.LaunchAtStartup"), AutoSize = true };
-        behavior.Controls.Add(VStack(_autocorrectBox, _notifyWrongLayoutBox, _fixCapsLockBox, _autoPunctuationBox, _launchAtStartupBox));
+        _scrollToSwitchBox  = new CheckBox { Text = T("General.Behavior.ScrollToSwitchLayout"), AutoSize = true };
+        behavior.Controls.Add(VStack(_autocorrectBox, _notifyWrongLayoutBox, _fixCapsLockBox, _autoPunctuationBox, _launchAtStartupBox, _scrollToSwitchBox));
 
         var hotkey = Card(T("General.Hotkey.Title"));
         var hotkeyInner = new TableLayoutPanel
@@ -1166,6 +1169,7 @@ sealed class SettingsForm : Form
         _notifyWrongLayoutBox.Checked = _settings.NotifyWrongLayout;
         _fixCapsLockBox.Checked       = _settings.FixCapsLock;
         _autoPunctuationBox.Checked   = _settings.AutoPunctuation;
+        _scrollToSwitchBox.Checked    = _settings.ScrollToSwitchLayout;
         _clipDelayBox.Value           = Math.Clamp(_settings.ClipboardDelayMs, 10, 1000);
         _undoThresholdBox.Value       = Math.Clamp(_settings.UndoLearnThreshold, 2, 10);
         _launchAtStartupBox.Checked   = StartupManager.IsEnabled();
@@ -1198,6 +1202,7 @@ sealed class SettingsForm : Form
         _settings.NotifyWrongLayout = _notifyWrongLayoutBox.Checked;
         _settings.FixCapsLock       = _fixCapsLockBox.Checked;
         _settings.AutoPunctuation   = _autoPunctuationBox.Checked;
+        _settings.ScrollToSwitchLayout = _scrollToSwitchBox.Checked;
         _settings.ClipboardDelayMs  = (int)_clipDelayBox.Value;
         _settings.UndoLearnThreshold = (int)_undoThresholdBox.Value;
 

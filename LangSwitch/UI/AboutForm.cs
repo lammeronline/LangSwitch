@@ -19,6 +19,7 @@ sealed class AboutForm : Form
         MinimizeBox     = false;
         StartPosition   = FormStartPosition.CenterParent;
         Font            = new Font("Segoe UI", 9f);
+        if (AppIcon.Shared is not null) Icon = AppIcon.Shared;
 
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         var versionText = version is null ? "" : $"v{version.Major}.{version.Minor}.{version.Build}";

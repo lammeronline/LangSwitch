@@ -30,6 +30,7 @@
   "General.Behavior.NotifyWrongLayout": "Показувати сповіщення, якщо слово може бути не в тій розкладці",
   "General.Behavior.FixCapsLock": "Виправляти випадковий Caps Lock (hELLO → Hello)",
   "General.Behavior.AutoPunctuation": "Автопунктуація (подвійний пробіл → крапка, \" - \" → — )",
+  "General.Behavior.ScrollToSwitchLayout": "Перемикати розкладку прокручуванням коліщатка над іконкою в треї",
   "General.Behavior.LaunchAtStartup": "Запускати LangSwitch разом із Windows",
 
   "General.Hotkey.Title": "Гарячі клавіші конвертації слова",

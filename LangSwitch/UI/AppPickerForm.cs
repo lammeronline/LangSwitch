@@ -19,6 +19,7 @@ sealed class AppPickerForm : Form
         MinimizeBox     = false;
         StartPosition   = FormStartPosition.CenterParent;
         Font            = new Font("Segoe UI", 9f);
+        if (AppIcon.Shared is not null) Icon = AppIcon.Shared;
 
         _list = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
         foreach (var (processName, title) in RunningWindowsEnumerator.GetVisibleAppWindows())

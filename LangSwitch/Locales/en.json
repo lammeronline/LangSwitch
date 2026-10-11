@@ -30,6 +30,7 @@
   "General.Behavior.NotifyWrongLayout": "Show balloon when a word may be in the wrong layout",
   "General.Behavior.FixCapsLock": "Fix accidental Caps Lock (hELLO → Hello)",
   "General.Behavior.AutoPunctuation": "Auto-punctuation (double space → period, \" - \" → — )",
+  "General.Behavior.ScrollToSwitchLayout": "Scroll over the tray icon to switch layout",
   "General.Behavior.LaunchAtStartup": "Launch LangSwitch when Windows starts",
 
   "General.Hotkey.Title": "Convert word hotkey",

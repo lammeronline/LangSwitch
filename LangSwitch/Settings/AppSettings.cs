@@ -15,6 +15,7 @@ public class AppSettings
     public string          UiLanguage          { get; set; } = "";
     public Keys            ConvertHotKey       { get; set; } = Keys.None;
     public int             ClipboardDelayMs    { get; set; } = 20;
+    public bool            ScrollToSwitchLayout { get; set; } = false;
 
     public List<string> ExcludedApps { get; set; } =
     [
