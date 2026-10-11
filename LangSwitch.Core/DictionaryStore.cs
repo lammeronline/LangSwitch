@@ -20,7 +20,10 @@ public static class DictionaryStore
             if (!File.Exists(FilePath)) return Defaults(seedLangs);
             var json = File.ReadAllText(FilePath);
             var list = JsonSerializer.Deserialize<List<UserDictionary>>(json, JsonOptions) ?? [];
-            return list.Count > 0 ? list : Defaults(seedLangs);
+            if (list.Count == 0) return Defaults(seedLangs);
+
+            RefreshStaleDefaultUrls(list);
+            return list;
         }
         catch (Exception ex)
         {
@@ -53,6 +56,32 @@ public static class DictionaryStore
             Enabled = true,
             Url     = WordListDownloader.UrlFor(lang),
         }).ToList();
+    }
+
+    /// <summary>
+    /// A dictionary's Url is set to WordListDownloader.UrlFor(lang) when the entry is first
+    /// created, then never touched again — so an older save on disk can carry a Url pointing
+    /// at a source this version no longer prefers (e.g. hermitdave before the Hunspell
+    /// migration). Re-resolve it on every load so Settings always shows, and downloads from,
+    /// the current default — but only for URLs that are themselves one of our own defaults,
+    /// never for a URL the user deliberately typed in to point at a different source.
+    /// </summary>
+    static void RefreshStaleDefaultUrls(List<UserDictionary> dicts)
+    {
+        var changed = false;
+        foreach (var dict in dicts)
+        {
+            if (string.IsNullOrWhiteSpace(dict.Lang) || string.IsNullOrEmpty(dict.Url)) continue;
+            if (!WordListDownloader.IsKnownDefaultUrl(dict.Url)) continue;
+
+            var current = WordListDownloader.UrlFor(dict.Lang.Trim().ToLowerInvariant());
+            if (dict.Url != current)
+            {
+                dict.Url = current;
+                changed = true;
+            }
+        }
+        if (changed) Save(dicts);
     }
 
     static string CultureDisplayName(string lang)

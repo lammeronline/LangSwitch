@@ -18,6 +18,19 @@ public static class WordListDownloader
     public static string UrlFor(string lang) =>
         $"https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries/{lang}/index.dic";
 
+    const string WooormBase = "https://raw.githubusercontent.com/wooorm/dictionaries/";
+    const string HermitdaveBase = "https://raw.githubusercontent.com/hermitdave/FrequencyWords/";
+
+    /// <summary>
+    /// True if this URL was one of our own auto-generated defaults (wooorm or hermitdave),
+    /// as opposed to something the user typed in manually to point at a different source.
+    /// Used to refresh stale defaults saved by an older version without touching a real
+    /// user customization.
+    /// </summary>
+    public static bool IsKnownDefaultUrl(string url) =>
+        url.StartsWith(WooormBase, StringComparison.OrdinalIgnoreCase) ||
+        url.StartsWith(HermitdaveBase, StringComparison.OrdinalIgnoreCase);
+
     static string HermitdaveUrlFor(string lang)
     {
         var year = KnownYears.GetValueOrDefault(lang, "2018");
