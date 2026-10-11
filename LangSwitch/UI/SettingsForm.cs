@@ -782,6 +782,41 @@ sealed class SettingsForm : Form
                 T("Languages.RemoveFailedPrefix") +
                 string.Join("\n", failed) + T("Languages.RemoveFailedSuffix"),
                 T("Common.AppName"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+        SyncDictionariesToInstalledLayouts();
+    }
+
+    /// <summary>
+    /// Keeps the dictionary list a pure reflection of whatever layouts are actually
+    /// installed — add a layout, its language's dictionary appears (and gets downloaded,
+    /// see TrayApplicationContext.DownloadMissingDictionaries); remove a layout, its
+    /// dictionary disappears. No hardcoded language list anywhere in this path.
+    /// </summary>
+    void SyncDictionariesToInstalledLayouts()
+    {
+        var installedLangs = WindowsLayoutDetector.GetInstalledLayouts()
+            .Select(l => l.Culture.TwoLetterISOLanguageName.ToLowerInvariant())
+            .ToHashSet();
+
+        foreach (var lang in installedLangs)
+        {
+            if (_dicts.Any(d => string.Equals(d.Lang, lang, StringComparison.OrdinalIgnoreCase))) continue;
+            _dicts.Add(new UserDictionary
+            {
+                Name    = CultureDisplayName(lang),
+                Lang    = lang,
+                Enabled = true,
+                Url     = WordListDownloader.UrlFor(lang),
+            });
+        }
+
+        _dicts.RemoveAll(d => !string.IsNullOrEmpty(d.Lang) && !installedLangs.Contains(d.Lang.ToLowerInvariant()));
+    }
+
+    static string CultureDisplayName(string lang)
+    {
+        try { return new System.Globalization.CultureInfo(lang).EnglishName; }
+        catch { return lang.ToUpperInvariant(); }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

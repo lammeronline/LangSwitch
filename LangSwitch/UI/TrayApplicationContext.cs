@@ -480,7 +480,34 @@ sealed class TrayApplicationContext : ApplicationContext
 
             RefreshTrayIcon(_monitor.Current);
             _autocorrectItem.Checked = _settings.AutocorrectEnabled;
+
+            DownloadMissingDictionaries();
         }
+    }
+
+    /// <summary>
+    /// Fires off a background download for any enabled dictionary that has no word list
+    /// loaded yet — chiefly the ones SettingsForm.SyncDictionariesToInstalledLayouts just
+    /// added for a newly installed keyboard layout, so "install a layout" alone is enough
+    /// to get working autocorrect for it, no manual Dictionaries-tab trip required.
+    /// </summary>
+    void DownloadMissingDictionaries()
+    {
+        var missing = _dicts.Where(d =>
+            d.Enabled && !string.IsNullOrEmpty(d.Lang) && !string.IsNullOrEmpty(d.Url) &&
+            _langDicts.WordCount(d.Lang) == 0).ToList();
+        if (missing.Count == 0) return;
+
+        SynchronizationContext.Current!.Post(async _ =>
+        {
+            foreach (var dict in missing)
+            {
+                try { await WordListDownloader.DownloadAsync(dict.Lang, dict.Url); }
+                catch (Exception ex) { AppLog.Error(ex); }
+            }
+            _langDicts.Reload(_dicts);
+            _engine.ReloadWordLists(_langDicts);
+        }, null);
     }
 
     void ResetUndoLearning()
