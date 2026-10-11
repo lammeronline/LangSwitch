@@ -26,6 +26,38 @@ static class LayoutManager
     [DllImport("user32.dll")]
     static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll")]
+    static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+
+    [DllImport("user32.dll")]
+    static extern IntPtr ActivateKeyboardLayout(IntPtr hkl, uint uFlags);
+
+    [DllImport("user32.dll")]
+    static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+
+    [DllImport("kernel32.dll")]
+    static extern uint GetCurrentThreadId();
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct RECT { public int Left, Top, Right, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct GUITHREADINFO
+    {
+        public int cbSize;
+        public uint flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public RECT rcCaret;
+    }
+
     const uint KLF_ACTIVATE = 0x00000001;
     const uint KLF_NOTELLSHELL = 0x00000080;
     const uint WM_SETTINGCHANGE = 0x001A;
@@ -36,14 +68,60 @@ static class LayoutManager
     // ── Public API ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Switches the foreground window's keyboard layout — the same mechanism Windows
-    /// itself uses for Alt+Shift / the language bar.
+    /// The currently foreground window — callers that are about to show their own UI (a
+    /// menu, a dialog) should capture this *before* doing so and pass it to
+    /// <see cref="ActivateLayout"/>, since showing that UI briefly makes it the foreground
+    /// window itself, which would otherwise receive the layout switch instead of the app
+    /// the user was actually typing in.
     /// </summary>
-    public static void ActivateLayout(LayoutInfo layout)
+    public static IntPtr CurrentForegroundWindow => GetForegroundWindow();
+
+    /// <summary>True if the given window belongs to this process (our own tray/menu/dialog
+    /// windows) — used to filter those out when tracking "the last real app window".</summary>
+    public static bool BelongsToCurrentProcess(IntPtr hwnd)
     {
-        var hwnd = GetForegroundWindow();
-        if (hwnd == IntPtr.Zero) return;
-        PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, layout.Handle);
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        return pid == (uint)Environment.ProcessId;
+    }
+
+    /// <summary>
+    /// Switches the target window's keyboard layout. The keyboard layout is a per-thread
+    /// input-queue attribute, so changing it for a thread other than our own requires
+    /// temporarily attaching our input queue to that thread's (AttachThreadInput) before
+    /// calling ActivateKeyboardLayout — the same mechanism real layout-switcher utilities
+    /// use; posting WM_INPUTLANGCHANGEREQUEST alone relies on the target's own window
+    /// procedure cooperating, which many apps (Electron/Chromium among them) simply never do.
+    /// </summary>
+    public static void ActivateLayout(LayoutInfo layout, IntPtr targetHwnd)
+    {
+        if (targetHwnd == IntPtr.Zero) return;
+
+        uint targetThreadId  = GetWindowThreadProcessId(targetHwnd, out _);
+        uint currentThreadId = GetCurrentThreadId();
+        if (targetThreadId == 0) return;
+
+        bool attached = targetThreadId != currentThreadId &&
+            AttachThreadInput(currentThreadId, targetThreadId, true);
+        try
+        {
+            ActivateKeyboardLayout(layout.Handle, 0);
+        }
+        finally
+        {
+            if (attached) AttachThreadInput(currentThreadId, targetThreadId, false);
+        }
+
+        // Courtesy notification for apps that do listen for it.
+        var focusHwnd = GetFocusedChildWindow(targetHwnd) ?? targetHwnd;
+        PostMessage(focusHwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, layout.Handle);
+    }
+
+    static IntPtr? GetFocusedChildWindow(IntPtr topLevelHwnd)
+    {
+        uint threadId = GetWindowThreadProcessId(topLevelHwnd, out _);
+        var info = new GUITHREADINFO { cbSize = Marshal.SizeOf<GUITHREADINFO>() };
+        if (!GetGUIThreadInfo(threadId, ref info)) return null;
+        return info.hwndFocus == IntPtr.Zero ? null : info.hwndFocus;
     }
 
     public static IReadOnlyList<AvailableLayout> GetAvailableLayouts()

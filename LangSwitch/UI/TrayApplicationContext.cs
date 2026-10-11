@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using LangSwitch.Autocorrect;
 using LangSwitch.Core;
@@ -25,9 +26,35 @@ sealed class TrayApplicationContext : ApplicationContext
     AppSettings _settings;
     Icon? _currentIcon;
     ToolStripMenuItem _autocorrectItem = null!;
+    ContextMenuStrip _mainMenu = null!;
+    ContextMenuStrip? _layoutPickerMenu;
+
+    // NotifyIcon has no public API to show a custom menu on a left click without side
+    // effects (a hand-rolled owner window either gets its own taskbar button or ends up
+    // positioned off the owner's — potentially offscreen — origin instead of the cursor).
+    // Its own private ShowContextMenu() already does this correctly internally (no taskbar
+    // artifact, correct activation) for whatever ContextMenuStrip is currently assigned —
+    // this reflects into that method so the same correct codepath can be reused for both
+    // buttons, swapping which menu is assigned right before invoking it. The method name
+    // has been stable since .NET Framework 1.1.
+    static readonly MethodInfo? ShowContextMenuMethod =
+        typeof(NotifyIcon).GetMethod("ShowContextMenu", BindingFlags.Instance | BindingFlags.NonPublic);
+
     string _lastWord     = string.Empty;
     char   _lastBoundary = '\0';
     PendingUndo? _pendingUndo;
+
+    // The most recent foreground window that belongs to some other app — i.e. whatever the
+    // user was last actually working in. Needed because, by the time a tray icon click is
+    // processed, the foreground window is often already Explorer's own tray/flyout UI
+    // (especially when the icon lives in the "hidden icons" overflow popup, which steals
+    // focus the moment it opens — well before the user's click on an icon inside it even
+    // registers), so a live GetForegroundWindow() call at click time is too late to see the
+    // real target. Kept up to date by polling (_foregroundPoll below) rather than only on
+    // keystrokes, so it's also correct for a window the user hasn't typed into yet (e.g. the
+    // Win+R Run dialog) — and additionally refreshed on every keystroke for good measure.
+    IntPtr _lastExternalWindow;
+    readonly System.Windows.Forms.Timer _foregroundPoll;
 
     readonly record struct PendingUndo(string Original, string Replacement, char Boundary);
 
@@ -55,13 +82,22 @@ sealed class TrayApplicationContext : ApplicationContext
         _hook.KeyDown      += OnKeyDown;
         _tracker.WordReady += OnWordReady;
 
+        _foregroundPoll = new System.Windows.Forms.Timer { Interval = 250 };
+        _foregroundPoll.Tick += (_, _) =>
+        {
+            var hwnd = LayoutManager.CurrentForegroundWindow;
+            if (hwnd != IntPtr.Zero && !LayoutManager.BelongsToCurrentProcess(hwnd))
+                _lastExternalWindow = hwnd;
+        };
+        _foregroundPoll.Start();
+
+        _mainMenu = BuildMenu();
         _tray = new NotifyIcon
         {
             Text = T("Common.AppName"),
             Visible = true,
-            ContextMenuStrip = BuildMenu(),
         };
-        _tray.MouseClick += OnTrayClick;
+        _tray.MouseDown += OnTrayClick;
 
         _monitor.Start();
         RefreshTrayIcon(_monitor.Current);
@@ -69,6 +105,8 @@ sealed class TrayApplicationContext : ApplicationContext
 
     void OnKeyDown(object? sender, HookKeyEventArgs e)
     {
+        _lastExternalWindow = LayoutManager.CurrentForegroundWindow;
+
         // Never buffer, autocorrect, or manually convert text in a password field.
         if (PasswordFieldDetector.IsFocusedFieldPassword())
         {
@@ -404,21 +442,49 @@ sealed class TrayApplicationContext : ApplicationContext
 
     void OnTrayClick(object? sender, MouseEventArgs e)
     {
-        if (e.Button != MouseButtons.Left) return;
-        ShowLayoutPicker();
+        // Deliberately not using NotifyIcon.ContextMenuStrip: Windows' modern tray host
+        // (especially the hidden-icons flyout) sometimes delivers the click as a context-menu
+        // request regardless of which mouse button was actually pressed, so an assigned
+        // ContextMenuStrip can pop up on a left click too — showing "Exit" right under the
+        // cursor instead of the layout picker. Instead, the correct menu for the actual
+        // button pressed is assigned right before showing it (see ShowContextMenuMethod).
+        if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Right) return;
+
+        // Prefer the polled last-known external window over a live GetForegroundWindow()
+        // call — by click time that often already returns Explorer's own tray/flyout UI
+        // instead (see _lastExternalWindow). Falls back to a live read for the rare case
+        // the app just launched and the poll hasn't ticked yet.
+        var targetHwnd = _lastExternalWindow != IntPtr.Zero ? _lastExternalWindow : LayoutManager.CurrentForegroundWindow;
+
+        if (e.Button == MouseButtons.Left)
+        {
+            _layoutPickerMenu?.Dispose();
+            _layoutPickerMenu = BuildLayoutPickerMenu(targetHwnd);
+            _tray.ContextMenuStrip = _layoutPickerMenu;
+        }
+        else
+        {
+            _tray.ContextMenuStrip = _mainMenu;
+        }
+
+        if (ShowContextMenuMethod is not null)
+        {
+            try { ShowContextMenuMethod.Invoke(_tray, null); return; }
+            catch (Exception ex) { AppLog.Error(ex); }
+        }
+        _tray.ContextMenuStrip?.Show(Cursor.Position); // fallback if reflection ever fails
     }
 
-    void ShowLayoutPicker()
+    ContextMenuStrip BuildLayoutPickerMenu(IntPtr targetHwnd)
     {
+        var menu = new ContextMenuStrip();
         var layouts = WindowsLayoutDetector.GetInstalledLayouts();
-        if (layouts.Count == 0) return;
+        if (layouts.Count == 0) return menu;
 
         var current = _monitor.Current;
-        var menu = new ContextMenuStrip();
         menu.Closed += (_, _) =>
         {
             foreach (ToolStripItem item in menu.Items) item.Image?.Dispose();
-            menu.Dispose();
         };
 
         foreach (var layout in layouts)
@@ -429,12 +495,12 @@ sealed class TrayApplicationContext : ApplicationContext
                 Image   = TrayIconFactory.Scale(flag, 16, 16),
                 Checked = current is not null && layout.Handle == current.Handle,
             };
-            item.Click += (_, _) => LayoutManager.ActivateLayout(layout);
+            item.Click += (_, _) => LayoutManager.ActivateLayout(layout, targetHwnd);
             menu.Items.Add(item);
         }
 
         MenuTheme.Apply(menu);
-        menu.Show(Cursor.Position);
+        return menu;
     }
 
     void OnLayoutChanged(object? sender, LayoutChangedEventArgs e)
@@ -476,7 +542,9 @@ sealed class TrayApplicationContext : ApplicationContext
             if (_settings.UiLanguage != langBefore)
             {
                 Load(_settings.UiLanguage);
-                _tray.ContextMenuStrip = BuildMenu();
+                var oldMenu = _mainMenu;
+                _mainMenu = BuildMenu();
+                oldMenu.Dispose();
             }
 
             RefreshTrayIcon(_monitor.Current);
@@ -533,9 +601,13 @@ sealed class TrayApplicationContext : ApplicationContext
         {
             _hook.Dispose();
             _tray.Dispose();
+            _mainMenu.Dispose();
+            _layoutPickerMenu?.Dispose();
             _currentIcon?.Dispose();
             _monitor.Dispose();
             _popup.Dispose();
+            _foregroundPoll.Stop();
+            _foregroundPoll.Dispose();
         }
         base.Dispose(disposing);
     }
