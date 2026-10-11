@@ -161,17 +161,19 @@ sealed class TrayApplicationContext : ApplicationContext
             return;
         }
 
-        if (_settings.ConvertHotKey != Keys.None)
+        if (MatchesHotkey(e, _settings.ConvertHotKey))
         {
-            var baseKey = _settings.ConvertHotKey & Keys.KeyCode;
-            var reqMods = _settings.ConvertHotKey & Keys.Modifiers;
-            if (e.Key == baseKey && Control.ModifierKeys == reqMods)
-            {
-                e.Handled = true;
-                _pendingUndo = null;
-                ScheduleConvert();
-                return;
-            }
+            e.Handled = true;
+            _pendingUndo = null;
+            ScheduleConvert();
+            return;
+        }
+
+        if (MatchesHotkey(e, _settings.ToggleAutocorrectHotKey))
+        {
+            e.Handled = true;
+            ToggleAutocorrect();
+            return;
         }
 
         if (_settings.AutoPunctuation && !IsExcludedApp() && _punctuator.TryHandle(e))
@@ -480,6 +482,23 @@ sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(T("Menu.Exit"), null, (_, _) => Quit());
         menu.Opening += (_, _) => MenuTheme.Apply(menu);
         return menu;
+    }
+
+    static bool MatchesHotkey(HookKeyEventArgs e, Keys hotkey)
+    {
+        if (hotkey == Keys.None) return false;
+        var baseKey = hotkey & Keys.KeyCode;
+        var reqMods = hotkey & Keys.Modifiers;
+        return e.Key == baseKey && Control.ModifierKeys == reqMods;
+    }
+
+    /// <summary>Flips AutocorrectEnabled via the menu checkbox itself, so its existing
+    /// CheckedChanged handler (save settings + refresh the tray icon) fires the same way it
+    /// does for a manual click — the hotkey is just another way to trigger that same toggle.</summary>
+    void ToggleAutocorrect()
+    {
+        _autocorrectItem.Checked = !_autocorrectItem.Checked;
+        Balloon(_settings.AutocorrectEnabled ? T("Balloon.AutocorrectOn") : T("Balloon.AutocorrectOff"));
     }
 
     void OnTrayClick(object? sender, MouseEventArgs e)

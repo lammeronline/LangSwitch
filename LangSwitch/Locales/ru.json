@@ -15,6 +15,7 @@
   "Settings.Title": "LangSwitch — Настройки",
 
   "Nav.General": "Общие",
+  "Nav.Hotkeys": "Горячие клавиши",
   "Nav.Appearance": "Внешний вид",
   "Nav.Exclusions": "Исключения",
   "Nav.Abbreviations": "Сокращения",
@@ -33,10 +34,12 @@
   "General.Behavior.ScrollToSwitchLayout": "Переключать раскладку прокруткой колёсика над иконкой в трее",
   "General.Behavior.LaunchAtStartup": "Запускать LangSwitch вместе с Windows",
 
-  "General.Hotkey.Title": "Хоткей конвертации слова",
-  "General.Hotkey.PressKey": "Нажмите клавишу:",
   "General.Hotkey.PressHotkeyPlaceholder": "Нажмите хоткей…",
   "General.Hotkey.None": "(нет)",
+
+  "Hotkeys.Title": "Горячие клавиши",
+  "Hotkeys.ConvertWord": "Конвертировать слово:",
+  "Hotkeys.ToggleAutocorrect": "Вкл/выкл автокоррекцию:",
 
   "General.Advanced.Title": "Дополнительно",
   "General.Advanced.ClipboardDelay": "Задержка синхронизации буфера обмена (мс):",
@@ -118,6 +121,8 @@
   "Balloon.WrongLayout": "Не та раскладка? → {0}{1}",
   "Balloon.PressToFix": " (нажмите {0}, чтобы исправить)",
   "Balloon.ErrorPrefix": "Ошибка: {0}",
+  "Balloon.AutocorrectOn": "Автокоррекция включена",
+  "Balloon.AutocorrectOff": "Автокоррекция выключена",
 
   "AppPicker.Title": "Выбор запущенного приложения",
   "AppPicker.ColumnTitle": "Окно",

@@ -15,6 +15,7 @@
   "Settings.Title": "LangSwitch — Налаштування",
 
   "Nav.General": "Загальні",
+  "Nav.Hotkeys": "Гарячі клавіші",
   "Nav.Appearance": "Вигляд",
   "Nav.Exclusions": "Винятки",
   "Nav.Abbreviations": "Скорочення",
@@ -33,10 +34,12 @@
   "General.Behavior.ScrollToSwitchLayout": "Перемикати розкладку прокручуванням коліщатка над іконкою в треї",
   "General.Behavior.LaunchAtStartup": "Запускати LangSwitch разом із Windows",
 
-  "General.Hotkey.Title": "Гарячі клавіші конвертації слова",
-  "General.Hotkey.PressKey": "Натисніть клавішу:",
   "General.Hotkey.PressHotkeyPlaceholder": "Натисніть хоткей…",
   "General.Hotkey.None": "(немає)",
+
+  "Hotkeys.Title": "Гарячі клавіші",
+  "Hotkeys.ConvertWord": "Конвертувати слово:",
+  "Hotkeys.ToggleAutocorrect": "Увімк/вимк автокорекцію:",
 
   "General.Advanced.Title": "Додатково",
   "General.Advanced.ClipboardDelay": "Затримка синхронізації буфера обміну (мс):",
@@ -118,6 +121,8 @@
   "Balloon.WrongLayout": "Не та розкладка? → {0}{1}",
   "Balloon.PressToFix": " (натисніть {0}, щоб виправити)",
   "Balloon.ErrorPrefix": "Помилка: {0}",
+  "Balloon.AutocorrectOn": "Автокорекцію увімкнено",
+  "Balloon.AutocorrectOff": "Автокорекцію вимкнено",
 
   "AppPicker.Title": "Вибір запущеного застосунку",
   "AppPicker.ColumnTitle": "Вікно",

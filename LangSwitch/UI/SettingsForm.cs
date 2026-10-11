@@ -43,11 +43,13 @@ sealed class SettingsForm : Form
     CheckBox _launchAtStartupBox = null!;
     ComboBox _languageBox = null!;
     List<(string Code, string DisplayName)> _languages = [];
-    TextBox  _hotkeyBox = null!;
     NumericUpDown _clipDelayBox = null!;
     NumericUpDown _undoThresholdBox = null!;
     Label    _learnedWordsLabel = null!;
-    Keys     _capturedKey;
+
+    // ── Hotkeys section ──────────────────────────────────────────────────────
+    Func<Keys> _getConvertHotkey = () => Keys.None;
+    Func<Keys> _getToggleAutocorrectHotkey = () => Keys.None;
 
     // ── Appearance section ───────────────────────────────────────────────────
     RadioButton _sizeSmall = null!, _sizeMedium = null!, _sizeLarge = null!;
@@ -165,13 +167,14 @@ sealed class SettingsForm : Form
 
         var btnGeneral      = MakeNavButton(T("Nav.General"));
         var btnAppearance   = MakeNavButton(T("Nav.Appearance"));
+        var btnHotkeys      = MakeNavButton(T("Nav.Hotkeys"));
         var btnExclusions   = MakeNavButton(T("Nav.Exclusions"));
         var btnAbbreviations = MakeNavButton(T("Nav.Abbreviations"));
         var btnStatistics   = MakeNavButton(T("Nav.Statistics"));
         var btnLanguages    = MakeNavButton(T("Nav.Languages"));
         var btnDictionaries = MakeNavButton(T("Nav.Dictionaries"));
 
-        var buttons = new[] { btnGeneral, btnAppearance, btnExclusions, btnAbbreviations, btnStatistics, btnLanguages, btnDictionaries };
+        var buttons = new[] { btnGeneral, btnAppearance, btnHotkeys, btnExclusions, btnAbbreviations, btnStatistics, btnLanguages, btnDictionaries };
 
         var table = new TableLayoutPanel
         {
@@ -190,6 +193,7 @@ sealed class SettingsForm : Form
 
         _navEntries.Add((btnGeneral,       BuildGeneralSection()));
         _navEntries.Add((btnAppearance,    BuildAppearanceSection()));
+        _navEntries.Add((btnHotkeys,       BuildHotkeysSection()));
         _navEntries.Add((btnExclusions,    BuildExclusionsSection()));
         _navEntries.Add((btnAbbreviations, BuildAbbreviationsSection()));
         _navEntries.Add((btnStatistics,    BuildStatisticsSection()));
@@ -345,47 +349,6 @@ sealed class SettingsForm : Form
         _scrollToSwitchBox  = new CheckBox { Text = T("General.Behavior.ScrollToSwitchLayout"), AutoSize = true };
         behavior.Controls.Add(VStack(_autocorrectBox, _notifyWrongLayoutBox, _fixCapsLockBox, _autoPunctuationBox, _launchAtStartupBox, _scrollToSwitchBox));
 
-        var hotkey = Card(T("General.Hotkey.Title"));
-        var hotkeyInner = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 1, Font = RegularFont,
-        };
-        hotkeyInner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        hotkeyInner.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
-        hotkeyInner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-
-        var hint = new Label { Text = T("General.Hotkey.PressKey"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
-        _capturedKey = _settings.ConvertHotKey;
-        _hotkeyBox = new TextBox
-        {
-            Width     = 130,
-            ReadOnly  = true,
-            BackColor = SystemColors.Window,
-            Text      = KeyLabel(_capturedKey),
-            Margin    = new Padding(0, 3, 8, 0),
-        };
-        _hotkeyBox.GotFocus  += (_, _) => _hotkeyBox.Text = T("General.Hotkey.PressHotkeyPlaceholder");
-        _hotkeyBox.LostFocus += (_, _) => _hotkeyBox.Text = KeyLabel(_capturedKey);
-        _hotkeyBox.KeyDown   += (_, e) =>
-        {
-            if (e.KeyCode is Keys.ShiftKey or Keys.ControlKey or Keys.Menu
-                          or Keys.LShiftKey or Keys.RShiftKey
-                          or Keys.LControlKey or Keys.RControlKey
-                          or Keys.LMenu or Keys.RMenu)
-                return;
-            e.SuppressKeyPress = true;
-            _capturedKey       = e.KeyCode | e.Modifiers;
-            _hotkeyBox.Text    = KeyLabel(_capturedKey);
-            _hotkeyBox.Parent?.Focus();
-        };
-        var btnClear = MakeButton(T("Common.Clear"));
-        btnClear.Click += (_, _) => { _capturedKey = Keys.None; _hotkeyBox.Text = KeyLabel(Keys.None); };
-
-        hotkeyInner.Controls.Add(hint, 0, 0);
-        hotkeyInner.Controls.Add(_hotkeyBox, 1, 0);
-        hotkeyInner.Controls.Add(btnClear, 2, 0);
-        hotkey.Controls.Add(hotkeyInner);
-
         var advanced = Card(T("General.Advanced.Title"));
         var advInner = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 2, Font = RegularFont };
         var lblDelay = new Label { Text = T("General.Advanced.ClipboardDelay"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
@@ -407,13 +370,87 @@ sealed class SettingsForm : Form
         advInner.Controls.Add(_learnedWordsLabel, 2, 1);
         advanced.Controls.Add(advInner);
 
-        return CardStack(iface, behavior, hotkey, advanced);
+        return CardStack(iface, behavior, advanced);
     }
 
     static string KeyLabel(Keys k)
     {
         var combo = HotkeyFormat.Combo(k);
         return combo.Length > 0 ? combo : T("General.Hotkey.None");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Hotkeys section
+    // ═══════════════════════════════════════════════════════════════════════
+
+    Panel BuildHotkeysSection()
+    {
+        var card = Card(T("Hotkeys.Title"));
+
+        // One shared TableLayoutPanel for every hotkey row, not one independent table per
+        // row — only this way does the AutoSize label column resolve to the same width (the
+        // max across every row) for all of them, so every field starts at the same X and
+        // every Clear button lines up at the same right edge, instead of each row silently
+        // picking its own width based on just its own label's length.
+        var grid = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 2,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Font = RegularFont,
+        };
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        AddHotkeyRow(grid, 0, T("Hotkeys.ConvertWord"), _settings.ConvertHotKey, out var getConvertKey);
+        AddHotkeyRow(grid, 1, T("Hotkeys.ToggleAutocorrect"), _settings.ToggleAutocorrectHotKey, out var getToggleKey);
+        _getConvertHotkey = getConvertKey;
+        _getToggleAutocorrectHotkey = getToggleKey;
+
+        card.Controls.Add(grid);
+        return CardStack(card);
+    }
+
+    /// <summary>
+    /// Adds one "label — capture box — Clear" row to a shared hotkeys grid. Factored out so
+    /// every hotkey in this tab reuses the same capture-box wiring (focus placeholder,
+    /// modifier-only-keypress filtering, Clear) instead of duplicating it per hotkey.
+    /// </summary>
+    void AddHotkeyRow(TableLayoutPanel grid, int row, string label, Keys initial, out Func<Keys> getValue)
+    {
+        var captured = new Keys[] { initial };
+        var bottomGap = row < grid.RowCount - 1 ? 10 : 0;
+
+        var hint = new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, bottomGap) };
+        var box = new TextBox
+        {
+            Dock = DockStyle.Fill, ReadOnly = true, BackColor = SystemColors.Window,
+            Text = KeyLabel(captured[0]), Margin = new Padding(0, 3, 8, bottomGap),
+        };
+        box.GotFocus  += (_, _) => box.Text = T("General.Hotkey.PressHotkeyPlaceholder");
+        box.LostFocus += (_, _) => box.Text = KeyLabel(captured[0]);
+        box.KeyDown   += (_, e) =>
+        {
+            if (e.KeyCode is Keys.ShiftKey or Keys.ControlKey or Keys.Menu
+                          or Keys.LShiftKey or Keys.RShiftKey
+                          or Keys.LControlKey or Keys.RControlKey
+                          or Keys.LMenu or Keys.RMenu)
+                return;
+            e.SuppressKeyPress = true;
+            captured[0]        = e.KeyCode | e.Modifiers;
+            box.Text           = KeyLabel(captured[0]);
+            box.Parent?.Focus();
+        };
+        var btnClear = MakeButton(T("Common.Clear"));
+        btnClear.Margin = new Padding(0, 0, 0, bottomGap);
+        btnClear.Click += (_, _) => { captured[0] = Keys.None; box.Text = KeyLabel(Keys.None); };
+
+        grid.Controls.Add(hint,     0, row);
+        grid.Controls.Add(box,      1, row);
+        grid.Controls.Add(btnClear, 2, row);
+
+        getValue = () => captured[0];
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1220,7 +1257,8 @@ sealed class SettingsForm : Form
         _settings.PopupSize = SizeOptions.First(o => o.Button.Checked).Value;
         _settings.PopupPosition = CornerOptions.First(o => o.Button.Checked).Value;
 
-        _settings.ConvertHotKey     = _capturedKey;
+        _settings.ConvertHotKey     = _getConvertHotkey();
+        _settings.ToggleAutocorrectHotKey = _getToggleAutocorrectHotkey();
         _settings.AutocorrectEnabled = _autocorrectBox.Checked;
         _settings.NotifyWrongLayout = _notifyWrongLayoutBox.Checked;
         _settings.FixCapsLock       = _fixCapsLockBox.Checked;

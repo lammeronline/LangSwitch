@@ -16,6 +16,7 @@
 
   "Nav.General": "General",
   "Nav.Appearance": "Appearance",
+  "Nav.Hotkeys": "Hotkeys",
   "Nav.Exclusions": "Exclusions",
   "Nav.Abbreviations": "Abbreviations",
   "Nav.Statistics": "Statistics",
@@ -33,10 +34,12 @@
   "General.Behavior.ScrollToSwitchLayout": "Scroll over the tray icon to switch layout",
   "General.Behavior.LaunchAtStartup": "Launch LangSwitch when Windows starts",
 
-  "General.Hotkey.Title": "Convert word hotkey",
-  "General.Hotkey.PressKey": "Press key:",
   "General.Hotkey.PressHotkeyPlaceholder": "Press hotkey…",
   "General.Hotkey.None": "(none)",
+
+  "Hotkeys.Title": "Hotkeys",
+  "Hotkeys.ConvertWord": "Convert word:",
+  "Hotkeys.ToggleAutocorrect": "Toggle autocorrect:",
 
   "General.Advanced.Title": "Advanced",
   "General.Advanced.ClipboardDelay": "Clipboard sync delay (ms):",
@@ -118,6 +121,8 @@
   "Balloon.WrongLayout": "Wrong layout? → {0}{1}",
   "Balloon.PressToFix": " (press {0} to fix)",
   "Balloon.ErrorPrefix": "Error: {0}",
+  "Balloon.AutocorrectOn": "Autocorrect turned on",
+  "Balloon.AutocorrectOff": "Autocorrect turned off",
 
   "AppPicker.Title": "Pick a running app",
   "AppPicker.ColumnTitle": "Window",

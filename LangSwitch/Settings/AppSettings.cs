@@ -14,6 +14,7 @@ public class AppSettings
     /// the system locale on first run and persists it.</summary>
     public string          UiLanguage          { get; set; } = "";
     public Keys            ConvertHotKey       { get; set; } = Keys.None;
+    public Keys            ToggleAutocorrectHotKey { get; set; } = Keys.None;
     public int             ClipboardDelayMs    { get; set; } = 20;
     public bool            ScrollToSwitchLayout { get; set; } = false;
 
