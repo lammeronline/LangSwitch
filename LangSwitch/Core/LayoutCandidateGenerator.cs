@@ -49,8 +49,11 @@ sealed class LayoutCandidateGenerator(ILayoutCharMapSource source) : ILayoutCand
     static Dictionary<char, char> Invert(IReadOnlyDictionary<char, char> map)
     {
         var inverse = new Dictionary<char, char>();
+        // TryAdd, not indexer assignment: if two distinct baseline keys happen to produce the
+        // same character under this layout, keep the first (deterministic), don't silently
+        // let a later entry clobber it.
         foreach (var (baseline, layoutChar) in map)
-            inverse[layoutChar] = baseline;
+            inverse.TryAdd(layoutChar, baseline);
         return inverse;
     }
 }

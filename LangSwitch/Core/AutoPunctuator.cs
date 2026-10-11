@@ -21,6 +21,8 @@ sealed class AutoPunctuator
     static extern int ToUnicodeEx(uint vk, uint scan, byte[] state,
         [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder buf, int bufLen, uint flags, IntPtr hkl);
 
+    const uint DontChangeKeyboardState = 0x4; // peek the translation without disturbing a live dead-key sequence
+
     char _prev1, _prev2; // _prev1 = most recently committed char
 
     /// <summary>Returns true if this keystroke was handled (swallowed + replacement injected).</summary>
@@ -61,8 +63,10 @@ sealed class AutoPunctuator
             return false;
         }
 
+        // DontChangeKeyboardState: this is a peek, not a commit — WordTracker's own
+        // ToUnicodeEx call (which does commit) is the one source of truth for dead-key state.
         var sb = new StringBuilder(4);
-        int res = ToUnicodeEx((uint)e.Key, e.ScanCode, keyState, sb, 4, 0, ForegroundLayout());
+        int res = ToUnicodeEx((uint)e.Key, e.ScanCode, keyState, sb, 4, DontChangeKeyboardState, ForegroundLayout());
         if (res == 1) Push(sb[0]);
 
         return false;

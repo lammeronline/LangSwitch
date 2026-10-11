@@ -208,21 +208,31 @@ sealed class TrayApplicationContext : ApplicationContext
             return false;
 
         var clipped = await ClipGetAsync();
-        // Full Trim() (not just \r\n) — some editors' "copy current line, no selection"
-        // behavior (e.g. Notepad++) includes a trailing space/newline that a plain
-        // Trim('\r','\n') wouldn't strip, breaking the line-copy-vs-real-selection check below.
-        var text = clipped?.Trim();
-
-        // Если скопированный текст совпадает с текущим или последним завершённым
-        // словом — это line-copy без реального выделения, а не выделение пользователя.
-        if (string.IsNullOrEmpty(text) || text == trackerBuf || text == lastWord)
+        if (string.IsNullOrEmpty(clipped))
         {
             await ClipSetAsync(prevClip);
             return false;
         }
 
-        var converted = _candidates.ConvertToOppositeLayout(text);
-        if (converted == text)
+        // Full Trim() (not just \r\n) — some editors' "copy current line, no selection"
+        // behavior (e.g. Notepad++) includes a trailing space/newline that a plain
+        // Trim('\r','\n') wouldn't strip, breaking the line-copy-vs-real-selection check
+        // below. This trimmed form is for *comparison only* — the actual conversion/paste
+        // below uses the untrimmed `clipped`, so a genuine selection that legitimately
+        // includes a trailing newline (e.g. a full line with its line terminator) doesn't
+        // get that newline silently dropped on paste-back.
+        var trimmedForComparison = clipped.Trim();
+
+        // Если скопированный текст совпадает с текущим или последним завершённым
+        // словом — это line-copy без реального выделения, а не выделение пользователя.
+        if (trimmedForComparison == trackerBuf || trimmedForComparison == lastWord)
+        {
+            await ClipSetAsync(prevClip);
+            return false;
+        }
+
+        var converted = _candidates.ConvertToOppositeLayout(clipped, _langDicts);
+        if (converted == clipped)
         {
             await ClipSetAsync(prevClip);
             Balloon("Can't determine target layout");
@@ -251,7 +261,7 @@ sealed class TrayApplicationContext : ApplicationContext
     {
         if (!string.IsNullOrEmpty(buf))
         {
-            var converted = _candidates.ConvertToOppositeLayout(buf);
+            var converted = _candidates.ConvertToOppositeLayout(buf, _langDicts);
             if (converted == buf) { Balloon("Can't determine target layout"); return; }
 
             _tracker.Set(converted);
@@ -259,7 +269,7 @@ sealed class TrayApplicationContext : ApplicationContext
         }
         else if (!string.IsNullOrEmpty(lastWord))
         {
-            var converted = _candidates.ConvertToOppositeLayout(lastWord);
+            var converted = _candidates.ConvertToOppositeLayout(lastWord, _langDicts);
             if (converted == lastWord) { Balloon("Can't determine target layout"); return; }
 
             int deleteCount = lastWord.Length + (lastBound != '\0' ? 1 : 0);
