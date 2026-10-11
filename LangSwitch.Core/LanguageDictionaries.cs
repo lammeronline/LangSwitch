@@ -2,22 +2,28 @@ namespace LangSwitch.Core;
 
 /// <summary>
 /// Holds per-language word sets used to decide which layout a typed word belongs to.
-/// Word lists are stored in %AppData%\LangSwitch\WordLists\{lang}.txt (one word per line).
+/// Languages loaded are driven entirely by the enabled <see cref="UserDictionary"/> entries
+/// passed in (from <see cref="DictionaryStore"/>) — there is no hardcoded language list.
+/// Word lists are read from %BaseDir%/WordLists/{lang}.txt (one word, or "word count", per line).
 /// </summary>
-sealed class LanguageDictionaries
+public sealed class LanguageDictionaries
 {
     public static readonly string WordListDir = Path.Combine(AppContext.BaseDirectory, "WordLists");
 
     Dictionary<string, HashSet<string>> _sets = new(StringComparer.OrdinalIgnoreCase);
 
-    public LanguageDictionaries() => Reload();
+    public LanguageDictionaries(IReadOnlyList<UserDictionary> dicts) => Reload(dicts);
 
-    public void Reload()
+    public void Reload(IReadOnlyList<UserDictionary> dicts)
     {
         var sets = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        LoadLang(sets, "en", FallbackEn);
-        LoadLang(sets, "ru", FallbackRu);
-        LoadLang(sets, "uk", FallbackUk);
+        foreach (var dict in dicts)
+        {
+            if (!dict.Enabled || string.IsNullOrWhiteSpace(dict.Lang)) continue;
+            var lang = dict.Lang.Trim().ToLowerInvariant();
+            var fallback = Fallbacks.GetValueOrDefault(lang, []);
+            LoadLang(sets, lang, fallback);
+        }
         _sets = sets;
     }
 
@@ -76,7 +82,10 @@ sealed class LanguageDictionaries
     static string Normalize(string w) =>
         new(w.Trim().ToLowerInvariant().Where(char.IsLetter).ToArray());
 
-    // ── Fallback word lists (loaded even without downloaded files) ───────────
+    // ── Fallback word lists (loaded even without downloaded files, en/ru/uk only) ──
+    // Note: Fallbacks must be declared after the arrays it references — static field
+    // initializers run in textual declaration order, so an earlier position here would
+    // capture null for each array.
 
     static readonly string[] FallbackEn =
     [
@@ -99,4 +108,11 @@ sealed class LanguageDictionaries
         "ми", "ви", "на", "що", "коли", "дякую", "будь-ласка", "зараз",
         "робота", "проект", "файл", "текст", "мова", "клавіатура",
     ];
+
+    static readonly IReadOnlyDictionary<string, string[]> Fallbacks = new Dictionary<string, string[]>
+    {
+        ["en"] = FallbackEn,
+        ["ru"] = FallbackRu,
+        ["uk"] = FallbackUk,
+    };
 }

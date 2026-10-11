@@ -3,6 +3,9 @@ bin/
 obj/
 build/out/
 
+# Claude Code (local permissions/session config — not for sharing)
+.claude/
+
 # Visual Studio
 .vs/
 *.user

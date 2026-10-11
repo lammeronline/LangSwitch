@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell($f = Get-Item \"C:\\\\Users\\\\lamme\\\\.claude\\\\projects\\\\d--Project-LangSwitch\\\\af87fcc5-f616-460e-a915-5f5cc4f4126a.jsonl\"; Write-Host \"Name: $\\($f.Name\\)\"; Write-Host \"Size: $\\($f.Length\\) bytes\"; Write-Host \"Modified: $\\($f.LastWriteTime\\)\")",
-      "PowerShell(dotnet build \"d:\\\\Project\\\\LangSwitch\\\\LangSwitch\\\\LangSwitch.csproj\" -c Debug --nologo 2>&1)",
-      "Bash(git init *)"
-    ]
-  }
-}

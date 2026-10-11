@@ -4,28 +4,62 @@ namespace LangSwitch.Autocorrect;
 
 sealed class AutocorrectEngine
 {
+    readonly ITextInjector _injector;
     LanguageDictionaries _langDicts;
+    IReadOnlyList<Abbreviation> _abbreviations;
+    bool _fixCapsLock;
 
-    public AutocorrectEngine(LanguageDictionaries langDicts) => _langDicts = langDicts;
+    public AutocorrectEngine(
+        LanguageDictionaries langDicts,
+        ITextInjector injector,
+        IReadOnlyList<Abbreviation> abbreviations,
+        bool fixCapsLock)
+    {
+        _langDicts      = langDicts;
+        _injector       = injector;
+        _abbreviations  = abbreviations;
+        _fixCapsLock    = fixCapsLock;
+    }
 
     public void ReloadWordLists(LanguageDictionaries l) => _langDicts = l;
+    public void ReloadAbbreviations(IReadOnlyList<Abbreviation> a) => _abbreviations = a;
+    public void SetFixCapsLock(bool enabled) => _fixCapsLock = enabled;
 
-    public bool TryReplace(WordReadyEventArgs e)
+    /// <summary>
+    /// Tries, in priority order, to expand a known abbreviation, fix an accidental
+    /// Caps-Lock inversion, or correct a wrong-layout word. Returns true and injects the
+    /// replacement if any of those applied; <paramref name="replacement"/> carries what was
+    /// typed in, so the caller can offer an undo.
+    /// </summary>
+    public bool TryReplace(WordReadyEventArgs e, out string? replacement)
     {
-        var corrected = LayoutAutoCorrector.TryCorrect(e.Word, _langDicts);
-        if (corrected is null) return false;
+        replacement = null;
+        var word = e.Word;
 
-        string replacement = PreserveCase(e.Word, corrected);
+        if (AbbreviationExpander.TryExpand(word, _abbreviations) is { } expansion)
+            replacement = PreserveCase(word, expansion);
+        else if (_fixCapsLock && CapsLockCorrector.TryFix(word, _langDicts) is { } capsFixed)
+            replacement = capsFixed; // already correctly cased
+        else if (LayoutAutoCorrector.TryCorrect(word, _langDicts) is { } layoutFixed)
+            replacement = PreserveCase(word, layoutFixed);
+
+        if (replacement is null) return false;
+
         e.HookArgs.Handled = true;
-        TextInjector.Replace(e.Word.Length, replacement + e.Boundary);
+        _injector.Replace(word.Length, replacement + e.Boundary);
         return true;
     }
 
-    static string PreserveCase(string typed, string replacement)
+    internal static string PreserveCase(string typed, string replacement)
     {
         if (replacement.Length == 0) return replacement;
+
+        if (typed.Length > 1 && typed == typed.ToUpperInvariant() && typed != typed.ToLowerInvariant())
+            return replacement.ToUpperInvariant();
+
         if (char.IsUpper(typed[0]) && char.IsLower(replacement[0]))
             return char.ToUpperInvariant(replacement[0]) + replacement[1..];
+
         return replacement;
     }
 }

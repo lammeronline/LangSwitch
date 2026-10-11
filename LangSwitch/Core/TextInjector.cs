@@ -52,8 +52,8 @@ static class TextInjector
 
         for (int i = 0; i < deleteCount; i++)
         {
-            inputs.Add(VkInput(0x08, 0));              // Backspace down
-            inputs.Add(VkInput(0x08, KEYEVENTF_KEYUP)); // Backspace up
+            inputs.Add(VkInput(0x08, 0));
+            inputs.Add(VkInput(0x08, KEYEVENTF_KEYUP));
         }
         foreach (char c in newText)
         {
@@ -62,6 +62,18 @@ static class TextInjector
         }
 
         SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<INPUT>());
+    }
+
+    public static void SendBackspaces(int count)
+    {
+        if (count <= 0) return;
+        var inputs = new INPUT[count * 2];
+        for (int i = 0; i < count; i++)
+        {
+            inputs[i * 2]     = VkInput(0x08, 0);
+            inputs[i * 2 + 1] = VkInput(0x08, KEYEVENTF_KEYUP);
+        }
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
     }
 
     static INPUT VkInput(ushort vk, uint flags) => new()

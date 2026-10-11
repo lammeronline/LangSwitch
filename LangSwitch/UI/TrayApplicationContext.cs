@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using LangSwitch.Autocorrect;
 using LangSwitch.Core;
 using LangSwitch.Settings;
@@ -14,18 +15,23 @@ sealed class TrayApplicationContext : ApplicationContext
     readonly AutocorrectEngine _engine;
     readonly LanguageDictionaries _langDicts;
     List<UserDictionary> _dicts;
+    List<Abbreviation> _abbreviations;
     AppSettings _settings;
     Icon? _currentIcon;
     ToolStripMenuItem _autocorrectItem = null!;
     string _lastWord     = string.Empty;
     char   _lastBoundary = '\0';
+    PendingUndo? _pendingUndo;
+
+    readonly record struct PendingUndo(string Original, string Replacement, char Boundary);
 
     public TrayApplicationContext()
     {
-        _settings  = SettingsStore.Load();
-        _dicts     = DictionaryStore.Load();
-        _langDicts = new LanguageDictionaries();
-        _engine    = new AutocorrectEngine(_langDicts);
+        _settings      = SettingsStore.Load();
+        _dicts         = DictionaryStore.Load();
+        _abbreviations = AbbreviationStore.Load();
+        _langDicts     = new LanguageDictionaries(_dicts);
+        _engine        = new AutocorrectEngine(_langDicts, new WinTextInjector(), _abbreviations, _settings.FixCapsLock);
 
         _popup   = new FlagPopupForm(_settings);
         _monitor = new LayoutMonitor();
@@ -42,6 +48,7 @@ sealed class TrayApplicationContext : ApplicationContext
             Visible = true,
             ContextMenuStrip = BuildMenu(),
         };
+        _tray.MouseClick += OnTrayClick;
 
         _monitor.Start();
         RefreshTrayIcon(_monitor.Current);
@@ -56,10 +63,24 @@ sealed class TrayApplicationContext : ApplicationContext
             if (e.Key == baseKey && Control.ModifierKeys == reqMods)
             {
                 e.Handled = true;
+                _pendingUndo = null;
                 ScheduleConvert();
                 return;
             }
         }
+
+        if (e.Key == Keys.Back && _pendingUndo is { } undo)
+        {
+            e.Handled = true;
+            _pendingUndo = null;
+            int deleteCount = undo.Replacement.Length + (undo.Boundary != '\0' ? 1 : 0);
+            string restore   = undo.Original + (undo.Boundary != '\0' ? undo.Boundary.ToString() : "");
+            TextInjector.Replace(deleteCount, restore);
+            _tracker.Clear();
+            return;
+        }
+        _pendingUndo = null; // any other key ends the undo window
+
         _tracker.Feed(e);
     }
 
@@ -75,8 +96,8 @@ sealed class TrayApplicationContext : ApplicationContext
         {
             try
             {
-                if (await TryConvertSelectionAsync()) return;
-                TryConvertWord(buf, lastWord, lastBound);
+                if (await TryConvertSelectionAsync(buf)) return;
+                await TryConvertWordAsync(buf, lastWord, lastBound);
             }
             catch (Exception ex)
             {
@@ -86,37 +107,82 @@ sealed class TrayApplicationContext : ApplicationContext
         }, null);
     }
 
-    // ── Selected text path ────────────────────────────────────────────────
-    async Task<bool> TryConvertSelectionAsync()
+    // ── Clipboard helpers (retry on CLIPBRD_E_CANT_OPEN) ─────────────────
+    static async Task<string?> ClipGetAsync()
     {
-        string? prevClip = Clipboard.ContainsText() ? Clipboard.GetText() : null;
+        for (int i = 0; i < 5; i++)
+        {
+            try { return Clipboard.ContainsText() ? Clipboard.GetText() : null; }
+            catch (ExternalException) { await Task.Delay(15); }
+        }
+        return null;
+    }
 
+    static async Task ClipSetAsync(string? text)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            try
+            {
+                if (text != null) Clipboard.SetText(text);
+                else Clipboard.Clear();
+                return;
+            }
+            catch (ExternalException) { await Task.Delay(15); }
+        }
+    }
+
+    // ── Selected text path ────────────────────────────────────────────────
+    // trackerBuf — текущее слово трекера; если буфер совпадает с тем, что
+    // скопировал Ctrl+C, значит приложение сделало «copy current line» без
+    // выделения (поведение нового Notepad), и надо переключиться на word-путь.
+    async Task<bool> TryConvertSelectionAsync(string trackerBuf)
+    {
+        const string sentinel = "__LS_NOSEL__";
+        string? prevClip = await ClipGetAsync();
+
+        await ClipSetAsync(sentinel);
         TextInjector.SendChord(0x11, 0x43); // Ctrl+C
         await Task.Delay(80);
 
-        if (!Clipboard.ContainsText()) return false;
-        var text = Clipboard.GetText();
-        if (string.IsNullOrEmpty(text) || text == prevClip) return false;
+        var clipped = await ClipGetAsync();
+        if (clipped == null || clipped == sentinel)
+        {
+            await ClipSetAsync(prevClip);
+            return false;
+        }
+
+        var text = clipped.Trim('\r', '\n');
+
+        // Если скопированный текст совпадает с текущим словом трекера —
+        // это line-copy без реального выделения, а не выделение пользователя.
+        if (string.IsNullOrEmpty(text) || text == trackerBuf)
+        {
+            await ClipSetAsync(prevClip);
+            return false;
+        }
 
         var converted = LayoutConverter.ConvertToOppositeLayout(text);
         if (converted == text)
         {
-            // restore clipboard and bail
-            if (prevClip != null) Clipboard.SetText(prevClip); else Clipboard.Clear();
+            await ClipSetAsync(prevClip);
             Balloon("Can't determine target layout");
             return true;
         }
 
-        Clipboard.SetText(converted);
-        await Task.Delay(30);
+        await ClipSetAsync(converted);
+        await Task.Delay(_settings.ClipboardDelayMs);
         TextInjector.SendChord(0x11, 0x56); // Ctrl+V
 
-        _tracker.Clear(); // cursor moved; buffer is stale
+        await Task.Delay(50);
+        await ClipSetAsync(prevClip);
+
+        _tracker.Clear();
         return true;
     }
 
     // ── Current-word / last-word path ─────────────────────────────────────
-    void TryConvertWord(string buf, string lastWord, char lastBound)
+    async Task TryConvertWordAsync(string buf, string lastWord, char lastBound)
     {
         if (!string.IsNullOrEmpty(buf))
         {
@@ -124,7 +190,7 @@ sealed class TrayApplicationContext : ApplicationContext
             if (converted == buf) { Balloon("Can't determine target layout"); return; }
 
             _tracker.Set(converted);
-            TextInjector.Replace(buf.Length, converted);
+            await ReplaceViaClipboardAsync(buf.Length, converted);
         }
         else if (!string.IsNullOrEmpty(lastWord))
         {
@@ -133,7 +199,7 @@ sealed class TrayApplicationContext : ApplicationContext
 
             int deleteCount = lastWord.Length + (lastBound != '\0' ? 1 : 0);
             string insert   = converted + (lastBound != '\0' ? lastBound.ToString() : "");
-            TextInjector.Replace(deleteCount, insert);
+            await ReplaceViaClipboardAsync(deleteCount, insert);
         }
         else
         {
@@ -141,13 +207,55 @@ sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
+    async Task ReplaceViaClipboardAsync(int deleteCount, string insert)
+    {
+        string? prevClip = await ClipGetAsync();
+
+        TextInjector.SendBackspaces(deleteCount);
+        await Task.Delay(30);
+
+        await ClipSetAsync(insert);
+        await Task.Delay(_settings.ClipboardDelayMs);
+        TextInjector.SendChord(0x11, 0x56); // Ctrl+V
+        await Task.Delay(50);
+
+        await ClipSetAsync(prevClip);
+    }
+
     void OnWordReady(object? sender, WordReadyEventArgs e)
     {
         _lastWord     = e.Word;
         _lastBoundary = e.Boundary;
 
-        if (_settings.AutocorrectEnabled && _engine.TryReplace(e))
+        if (IsExcludedApp()) return;
+
+        if (_settings.AutocorrectEnabled && _engine.TryReplace(e, out var replacement))
+        {
+            _pendingUndo = new PendingUndo(e.Word, replacement!, e.Boundary);
             _lastWord = string.Empty;
+            return;
+        }
+
+        if (_settings.NotifyWrongLayout)
+        {
+            var corrected = LayoutAutoCorrector.TryCorrect(e.Word, _langDicts);
+            if (corrected is not null)
+            {
+                var hotKey = _settings.ConvertHotKey != Keys.None
+                    ? $" (press {HotKeyLabel(_settings.ConvertHotKey)} to fix)"
+                    : "";
+                Balloon($"Wrong layout? → {corrected}{hotKey}");
+            }
+        }
+    }
+
+    bool IsExcludedApp()
+    {
+        if (_settings.ExcludedApps.Count == 0) return false;
+        var name = WindowsLayoutDetector.GetForegroundProcessName();
+        if (name is null) return false;
+        return _settings.ExcludedApps.Any(x =>
+            string.Equals(Path.GetFileNameWithoutExtension(x), name, StringComparison.OrdinalIgnoreCase));
     }
 
     void Balloon(string msg) =>
@@ -189,6 +297,40 @@ sealed class TrayApplicationContext : ApplicationContext
         return string.Join("+", parts);
     }
 
+    void OnTrayClick(object? sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left) return;
+        ShowLayoutPicker();
+    }
+
+    void ShowLayoutPicker()
+    {
+        var layouts = WindowsLayoutDetector.GetInstalledLayouts();
+        if (layouts.Count == 0) return;
+
+        var current = _monitor.Current;
+        var menu = new ContextMenuStrip();
+        menu.Closed += (_, _) =>
+        {
+            foreach (ToolStripItem item in menu.Items) item.Image?.Dispose();
+            menu.Dispose();
+        };
+
+        foreach (var layout in layouts)
+        {
+            using var flag = TrayIconFactory.LoadFlagBitmap(layout.FlagCode);
+            var item = new ToolStripMenuItem(layout.DisplayName)
+            {
+                Image   = TrayIconFactory.Scale(flag, 16, 16),
+                Checked = current is not null && layout.Handle == current.Handle,
+            };
+            item.Click += (_, _) => LayoutManager.ActivateLayout(layout);
+            menu.Items.Add(item);
+        }
+
+        menu.Show(Cursor.Position);
+    }
+
     void OnLayoutChanged(object? sender, LayoutChangedEventArgs e)
     {
         RefreshTrayIcon(e.Current);
@@ -209,15 +351,19 @@ sealed class TrayApplicationContext : ApplicationContext
 
     void OpenSettings()
     {
-        using var form = new SettingsForm(_settings, _dicts, _langDicts);
+        using var form = new SettingsForm(_settings, _dicts, _langDicts, _abbreviations);
         if (form.ShowDialog() == DialogResult.OK)
         {
             SettingsStore.Save(_settings);
             DictionaryStore.Save(_dicts);
-            _langDicts.Reload();
+            AbbreviationStore.Save(_abbreviations);
+            _langDicts.Reload(_dicts);
             _engine.ReloadWordLists(_langDicts);
+            _engine.ReloadAbbreviations(_abbreviations);
+            _engine.SetFixCapsLock(_settings.FixCapsLock);
             _popup.ApplySettings(_settings);
             RefreshTrayIcon(_monitor.Current);
+            _autocorrectItem.Checked = _settings.AutocorrectEnabled;
         }
     }
 

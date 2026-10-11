@@ -1,8 +1,6 @@
-using LangSwitch.Core;
+namespace LangSwitch.Core;
 
-namespace LangSwitch.Autocorrect;
-
-static class WordListDownloader
+public static class WordListDownloader
 {
     static readonly HttpClient Http = new();
 

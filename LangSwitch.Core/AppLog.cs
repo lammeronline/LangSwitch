@@ -1,6 +1,6 @@
 namespace LangSwitch;
 
-static class AppLog
+public static class AppLog
 {
     static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "LangSwitch.log");
 

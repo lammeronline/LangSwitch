@@ -1,14 +1,19 @@
 @echo off
 setlocal
 
-set SLN=%~dp0..\LangSwitch.sln
+set PROJ=%~dp0..\LangSwitch\LangSwitch.csproj
 set OUT=%~dp0out
 
 echo Stopping running instance...
 taskkill /f /im LangSwitch.exe >nul 2>&1
 
-echo Building LangSwitch...
-dotnet publish "%SLN%" -c Release -r win-x64 --self-contained false -o "%OUT%"
+if exist "%OUT%" rmdir /s /q "%OUT%"
+
+echo Building LangSwitch (single-file, self-contained)...
+dotnet publish "%PROJ%" -c Release -r win-x64 --self-contained true ^
+    -p:PublishSingleFile=true ^
+    -p:IncludeNativeLibrariesForSelfExtract=true ^
+    -o "%OUT%"
 
 if %errorlevel% neq 0 (
     echo.

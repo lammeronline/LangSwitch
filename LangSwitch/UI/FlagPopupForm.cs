@@ -140,7 +140,7 @@ sealed class FlagPopupForm : Form
 
     Point CalcLocation()
     {
-        var area = Screen.PrimaryScreen?.WorkingArea ?? Screen.GetWorkingArea(Point.Empty);
+        var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         const int margin = 20;
 
         return _settings.PopupPosition switch

@@ -1,6 +1,6 @@
-namespace LangSwitch.Autocorrect;
+namespace LangSwitch.Core;
 
-sealed class UserDictionary
+public sealed class UserDictionary
 {
     public string Name    { get; set; } = "Dictionary";
     public string Lang    { get; set; } = "";

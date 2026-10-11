@@ -20,13 +20,31 @@ static class LayoutManager
     static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg,
         IntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
 
+    [DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
     const uint KLF_ACTIVATE = 0x00000001;
     const uint KLF_NOTELLSHELL = 0x00000080;
     const uint WM_SETTINGCHANGE = 0x001A;
+    const uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
     const uint SMTO_ABORTIFHUNG = 0x0002;
     static readonly IntPtr HWND_BROADCAST = new(0xFFFF);
 
     // ── Public API ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Switches the foreground window's keyboard layout — the same mechanism Windows
+    /// itself uses for Alt+Shift / the language bar.
+    /// </summary>
+    public static void ActivateLayout(LayoutInfo layout)
+    {
+        var hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero) return;
+        PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, layout.Handle);
+    }
 
     public static IReadOnlyList<AvailableLayout> GetAvailableLayouts()
     {
@@ -57,7 +75,7 @@ static class LayoutManager
             {
                 Klid = klid.ToUpperInvariant(),
                 Name = name,
-                FlagCode = ResolveFlagCode(culture),
+                FlagCode = FlagResolver.Resolve(culture),
                 ShortCode = culture.TwoLetterISOLanguageName.ToUpperInvariant(),
                 IsInstalled = installed.Contains(klid.ToUpperInvariant()),
             });
@@ -151,36 +169,4 @@ static class LayoutManager
             IntPtr.Zero, "intl", SMTO_ABORTIFHUNG, 3000, out _);
     }
 
-    // ── Culture helpers ─────────────────────────────────────────────────────
-
-    static string ResolveFlagCode(CultureInfo culture)
-    {
-        if (!culture.IsNeutralCulture && !string.IsNullOrEmpty(culture.Name))
-        {
-            try { return new RegionInfo(culture.Name).TwoLetterISORegionName.ToLowerInvariant(); }
-            catch { }
-        }
-        return culture.TwoLetterISOLanguageName.ToLowerInvariant() switch
-        {
-            "en" => "us",
-            "ru" => "ru",
-            "uk" => "ua",
-            "de" => "de",
-            "fr" => "fr",
-            "es" => "es",
-            "pl" => "pl",
-            "be" => "by",
-            "kk" => "kz",
-            "ky" => "kg",
-            "tg" => "tj",
-            "uz" => "uz",
-            "ka" => "ge",
-            "hy" => "am",
-            "az" => "az",
-            "lt" => "lt",
-            "lv" => "lv",
-            "et" => "ee",
-            var x => x,
-        };
-    }
 }

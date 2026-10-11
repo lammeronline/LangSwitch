@@ -18,7 +18,7 @@ sealed class LayoutInfo
     public static LayoutInfo FromInputLanguage(InputLanguage lang)
     {
         var culture = lang.Culture;
-        var flagCode = ResolveFlag(culture);
+        var flagCode = FlagResolver.Resolve(culture);
         return new LayoutInfo
         {
             Handle = lang.Handle,
@@ -26,26 +26,6 @@ sealed class LayoutInfo
             DisplayName = culture.DisplayName,
             ShortCode = flagCode.ToUpperInvariant(),
             FlagCode = flagCode,
-        };
-    }
-
-    static string ResolveFlag(CultureInfo culture)
-    {
-        if (!culture.IsNeutralCulture && !string.IsNullOrEmpty(culture.Name))
-        {
-            try { return new RegionInfo(culture.Name).TwoLetterISORegionName.ToLowerInvariant(); }
-            catch { }
-        }
-        // Neutral culture fallback: language → flag mapping for common cases
-        return culture.TwoLetterISOLanguageName.ToLowerInvariant() switch
-        {
-            "en" => "us",
-            "ru" => "ru",
-            "uk" => "ua",
-            "de" => "de",
-            "fr" => "fr",
-            "es" => "es",
-            var x => x,
         };
     }
 

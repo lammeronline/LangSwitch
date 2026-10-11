@@ -4,7 +4,7 @@ namespace LangSwitch.Core;
 /// Physical-key layout conversion tables: Latin ↔ Russian / Ukrainian.
 /// Ported from the original LanguageSwitcher project.
 /// </summary>
-static class LayoutConverter
+public static class LayoutConverter
 {
     static readonly Dictionary<char, char> LatinToRussian = new()
     {
@@ -54,7 +54,13 @@ static class LayoutConverter
         };
     }
 
-    /// <summary>Returns all layout-converted candidates for the given word.</summary>
+    /// <summary>
+    /// Returns all layout-converted candidates for the given word. Candidates are only
+    /// generated for en/ru/uk — these are the only languages with physical-key conversion
+    /// tables. A dictionary configured for any other language is still usable for
+    /// <see cref="LanguageDictionaries.ContainsAny"/> checks, it just never gets a
+    /// conversion candidate generated for it here.
+    /// </summary>
     public static IEnumerable<(string Word, string Lang)> GetAllCandidates(string text)
     {
         if (text.Any(IsLatin))

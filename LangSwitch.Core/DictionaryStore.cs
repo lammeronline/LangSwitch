@@ -1,8 +1,8 @@
 using System.Text.Json;
 
-namespace LangSwitch.Autocorrect;
+namespace LangSwitch.Core;
 
-static class DictionaryStore
+public static class DictionaryStore
 {
     static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "dictionaries.json");
 
@@ -17,7 +17,11 @@ static class DictionaryStore
             var list = JsonSerializer.Deserialize<List<UserDictionary>>(json, JsonOptions) ?? [];
             return list.Count > 0 ? list : Defaults();
         }
-        catch { return Defaults(); }
+        catch (Exception ex)
+        {
+            AppLog.Error(ex);
+            return Defaults();
+        }
     }
 
     public static void Save(List<UserDictionary> dicts)
@@ -26,7 +30,10 @@ static class DictionaryStore
         {
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dicts, JsonOptions));
         }
-        catch { }
+        catch (Exception ex)
+        {
+            AppLog.Error(ex);
+        }
     }
 
     static List<UserDictionary> Defaults() =>

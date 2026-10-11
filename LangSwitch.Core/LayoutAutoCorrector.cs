@@ -1,8 +1,6 @@
-using LangSwitch.Core;
+namespace LangSwitch.Core;
 
-namespace LangSwitch.Autocorrect;
-
-static class LayoutAutoCorrector
+public static class LayoutAutoCorrector
 {
     /// <summary>
     /// If the word looks like it was typed on the wrong layout, returns the corrected

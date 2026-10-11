@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace LangSwitch.Core;
@@ -41,5 +42,20 @@ static class WindowsLayoutDetector
         foreach (InputLanguage lang in InputLanguage.InstalledInputLanguages)
             list.Add(LayoutInfo.FromInputLanguage(lang));
         return list;
+    }
+
+    /// <summary>Process name (no extension) of the app currently in the foreground, or null.</summary>
+    public static string? GetForegroundProcessName()
+    {
+        var hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero) return null;
+
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        try
+        {
+            using var proc = Process.GetProcessById((int)pid);
+            return proc.ProcessName;
+        }
+        catch (ArgumentException) { return null; } // process already exited
     }
 }

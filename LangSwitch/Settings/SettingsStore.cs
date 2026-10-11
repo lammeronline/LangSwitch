@@ -16,8 +16,9 @@ static class SettingsStore
             var json = File.ReadAllText(FilePath);
             return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            AppLog.Error(ex);
             return new AppSettings();
         }
     }
@@ -28,6 +29,9 @@ static class SettingsStore
         {
             File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOptions));
         }
-        catch { }
+        catch (Exception ex)
+        {
+            AppLog.Error(ex);
+        }
     }
 }
