@@ -1,0 +1,106 @@
+{
+  "_displayName": "Українська",
+
+  "Common.OK": "ОК",
+  "Common.Cancel": "Скасувати",
+  "Common.Clear": "Очистити",
+  "Common.Add": "+ Додати",
+  "Common.Remove": "− Видалити",
+  "Common.AppName": "LangSwitch",
+
+  "Settings.Title": "LangSwitch — Налаштування",
+
+  "Nav.General": "Загальні",
+  "Nav.Appearance": "Вигляд",
+  "Nav.Exclusions": "Винятки",
+  "Nav.Abbreviations": "Скорочення",
+  "Nav.Statistics": "Статистика",
+  "Nav.Languages": "Мови",
+  "Nav.Dictionaries": "Словники",
+
+  "General.Interface.Title": "Інтерфейс",
+  "General.Interface.Language": "Мова:",
+
+  "General.Behavior.Title": "Поведінка",
+  "General.Behavior.EnableAutocorrect": "Увімкнути автовиправлення",
+  "General.Behavior.NotifyWrongLayout": "Показувати сповіщення, якщо слово може бути не в тій розкладці",
+  "General.Behavior.FixCapsLock": "Виправляти випадковий Caps Lock (hELLO → Hello)",
+  "General.Behavior.AutoPunctuation": "Автопунктуація (подвійний пробіл → крапка, \" - \" → — )",
+  "General.Behavior.LaunchAtStartup": "Запускати LangSwitch разом із Windows",
+
+  "General.Hotkey.Title": "Гарячі клавіші конвертації слова",
+  "General.Hotkey.PressKey": "Натисніть клавішу:",
+  "General.Hotkey.PressHotkeyPlaceholder": "Натисніть хоткей…",
+  "General.Hotkey.None": "(немає)",
+
+  "General.Advanced.Title": "Додатково",
+  "General.Advanced.ClipboardDelay": "Затримка синхронізації буфера обміну (мс):",
+  "General.Advanced.ClipboardDelayHint": "20 = локально · 200–400 = віддалений робочий стіл (напр. TeamViewer)",
+  "General.Advanced.UndoThreshold": "Припинити виправляти слово після стількох скасувань:",
+  "General.Advanced.LearnedWordsCount": "{0} слів(о) зараз виключено таким чином",
+
+  "Appearance.FlagSize.Title": "Розмір прапора",
+  "Appearance.FlagSize.Small": "Маленький (64 px)",
+  "Appearance.FlagSize.Medium": "Середній (96 px)",
+  "Appearance.FlagSize.Large": "Великий (128 px)",
+
+  "Appearance.Position.Title": "Позиція спливаючого вікна",
+  "Appearance.Position.TopLeft": "↖  Зверху зліва",
+  "Appearance.Position.TopRight": "↗  Зверху справа",
+  "Appearance.Position.BottomLeft": "↙  Знизу зліва",
+  "Appearance.Position.BottomRight": "↘  Знизу справа",
+
+  "Exclusions.Hint": "LangSwitch не виправлятиме та не сповіщатиме, поки активні ці застосунки\n(ім'я процесу, напр. cmd.exe):",
+  "Exclusions.Placeholder": "напр. notepad.exe",
+  "Exclusions.PickRunningApp": "Обрати запущений застосунок…",
+
+  "Abbreviations.Hint": "Введіть слово-тригер — воно розгорнеться, щойно ви його допишете:",
+  "Abbreviations.Trigger": "Тригер:",
+  "Abbreviations.ExpandsTo": "Розгортається в:",
+
+  "Statistics.Title": "Локальна статистика",
+  "Statistics.WordsCorrected": "Виправлено слів:",
+  "Statistics.CharactersFixed": "Виправлено символів:",
+  "Statistics.ManualConversions": "Ручних конвертацій:",
+  "Statistics.TimeSaved": "Приблизно заощаджено часу:",
+  "Statistics.LearnedWords": "Слів виключено через навчання на undo:",
+  "Statistics.PrivacyHint": "Зберігається лише локально — нікуди не надсилається.",
+  "Statistics.ResetStats": "Скинути статистику",
+  "Statistics.ResetLearned": "Скинути вивчені слова",
+
+  "Languages.Hint": "Розкладки клавіатури (позначте, щоб встановити, зніміть — щоб видалити):",
+  "Languages.SearchPlaceholder": "Пошук…",
+  "Languages.SignOutHint": "Деякі зміни можуть потребувати виходу з системи та повторного входу.",
+  "Languages.RemoveFailedPrefix": "Не вдалося видалити такі розкладки (можливо, вони використовуються):\n\n",
+  "Languages.RemoveFailedSuffix": "\n\nСпробуйте вийти з системи та увійти знову.",
+
+  "Dictionaries.Hint": "Словники списків слів:",
+  "Dictionaries.Name": "Назва:",
+  "Dictionaries.Lang": "Мова:",
+  "Dictionaries.Url": "URL:",
+  "Dictionaries.Download": "⬇ Завантажити",
+  "Dictionaries.NotDownloaded": "Не завантажено",
+  "Dictionaries.WordsLoaded": "{0} слів завантажено ✓",
+  "Dictionaries.NewDictionaryName": "Новий словник",
+  "Dictionaries.EnterLangCode": "Введіть код мови (напр. en, ru, uk).",
+  "Dictionaries.EnterValidUrl": "Введіть коректний http:// або https:// URL.",
+  "Dictionaries.DownloadSuccess": "Завантажено {0} слів для {1}.",
+  "Dictionaries.NetworkError": "Помилка мережі:\n{0}",
+  "Dictionaries.GenericError": "Помилка:\n{0}",
+
+  "Menu.Autocorrect": "Автовиправлення",
+  "Menu.ConvertWord": "Конвертувати слово",
+  "Menu.Settings": "Налаштування…",
+  "Menu.Exit": "Вихід",
+
+  "Tray.AutocorrectOnSuffix": " (автовиправлення увімк.)",
+
+  "Balloon.CantDetermineLayout": "Не вдалося визначити цільову розкладку",
+  "Balloon.ClipboardBusy": "Буфер обміну зайнятий — спробуйте ще раз",
+  "Balloon.NoWordToConvert": "Немає слова для конвертації — спочатку надрукуйте слово",
+  "Balloon.WrongLayout": "Не та розкладка? → {0}{1}",
+  "Balloon.PressToFix": " (натисніть {0}, щоб виправити)",
+  "Balloon.ErrorPrefix": "Помилка: {0}",
+
+  "AppPicker.Title": "Вибір запущеного застосунку"
+}

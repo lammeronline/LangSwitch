@@ -1,0 +1,106 @@
+{
+  "_displayName": "Русский",
+
+  "Common.OK": "ОК",
+  "Common.Cancel": "Отмена",
+  "Common.Clear": "Очистить",
+  "Common.Add": "+ Добавить",
+  "Common.Remove": "− Удалить",
+  "Common.AppName": "LangSwitch",
+
+  "Settings.Title": "LangSwitch — Настройки",
+
+  "Nav.General": "Общие",
+  "Nav.Appearance": "Внешний вид",
+  "Nav.Exclusions": "Исключения",
+  "Nav.Abbreviations": "Сокращения",
+  "Nav.Statistics": "Статистика",
+  "Nav.Languages": "Языки",
+  "Nav.Dictionaries": "Словари",
+
+  "General.Interface.Title": "Интерфейс",
+  "General.Interface.Language": "Язык:",
+
+  "General.Behavior.Title": "Поведение",
+  "General.Behavior.EnableAutocorrect": "Включить автокоррекцию",
+  "General.Behavior.NotifyWrongLayout": "Показывать уведомление, если слово может быть не в той раскладке",
+  "General.Behavior.FixCapsLock": "Исправлять случайный Caps Lock (hELLO → Hello)",
+  "General.Behavior.AutoPunctuation": "Автопунктуация (двойной пробел → точка, \" - \" → — )",
+  "General.Behavior.LaunchAtStartup": "Запускать LangSwitch вместе с Windows",
+
+  "General.Hotkey.Title": "Хоткей конвертации слова",
+  "General.Hotkey.PressKey": "Нажмите клавишу:",
+  "General.Hotkey.PressHotkeyPlaceholder": "Нажмите хоткей…",
+  "General.Hotkey.None": "(нет)",
+
+  "General.Advanced.Title": "Дополнительно",
+  "General.Advanced.ClipboardDelay": "Задержка синхронизации буфера обмена (мс):",
+  "General.Advanced.ClipboardDelayHint": "20 = локально · 200–400 = удалённый рабочий стол (напр. TeamViewer)",
+  "General.Advanced.UndoThreshold": "Перестать исправлять слово после стольких отмен:",
+  "General.Advanced.LearnedWordsCount": "{0} слов(о) сейчас исключено таким образом",
+
+  "Appearance.FlagSize.Title": "Размер флага",
+  "Appearance.FlagSize.Small": "Маленький (64 px)",
+  "Appearance.FlagSize.Medium": "Средний (96 px)",
+  "Appearance.FlagSize.Large": "Большой (128 px)",
+
+  "Appearance.Position.Title": "Позиция попапа",
+  "Appearance.Position.TopLeft": "↖  Слева сверху",
+  "Appearance.Position.TopRight": "↗  Справа сверху",
+  "Appearance.Position.BottomLeft": "↙  Слева снизу",
+  "Appearance.Position.BottomRight": "↘  Справа снизу",
+
+  "Exclusions.Hint": "LangSwitch не будет автоисправлять или уведомлять, пока активны эти приложения\n(имя процесса, напр. cmd.exe):",
+  "Exclusions.Placeholder": "напр. notepad.exe",
+  "Exclusions.PickRunningApp": "Выбрать запущенное приложение…",
+
+  "Abbreviations.Hint": "Введите слово-триггер — оно раскроется, как только вы его допечатаете:",
+  "Abbreviations.Trigger": "Триггер:",
+  "Abbreviations.ExpandsTo": "Раскрывается в:",
+
+  "Statistics.Title": "Локальная статистика",
+  "Statistics.WordsCorrected": "Исправлено слов:",
+  "Statistics.CharactersFixed": "Исправлено символов:",
+  "Statistics.ManualConversions": "Ручных конвертаций:",
+  "Statistics.TimeSaved": "Примерно сэкономлено времени:",
+  "Statistics.LearnedWords": "Слов исключено через обучение на undo:",
+  "Statistics.PrivacyHint": "Хранится только локально — никуда не отправляется.",
+  "Statistics.ResetStats": "Сбросить статистику",
+  "Statistics.ResetLearned": "Сбросить выученные слова",
+
+  "Languages.Hint": "Раскладки клавиатуры (отметьте, чтобы установить, снимите — чтобы удалить):",
+  "Languages.SearchPlaceholder": "Поиск…",
+  "Languages.SignOutHint": "Некоторые изменения могут потребовать выхода из системы и повторного входа.",
+  "Languages.RemoveFailedPrefix": "Не удалось удалить следующие раскладки (возможно, они используются):\n\n",
+  "Languages.RemoveFailedSuffix": "\n\nПопробуйте выйти из системы и войти снова.",
+
+  "Dictionaries.Hint": "Словари списков слов:",
+  "Dictionaries.Name": "Имя:",
+  "Dictionaries.Lang": "Язык:",
+  "Dictionaries.Url": "URL:",
+  "Dictionaries.Download": "⬇ Скачать",
+  "Dictionaries.NotDownloaded": "Не скачано",
+  "Dictionaries.WordsLoaded": "{0} слов загружено ✓",
+  "Dictionaries.NewDictionaryName": "Новый словарь",
+  "Dictionaries.EnterLangCode": "Введите код языка (напр. en, ru, uk).",
+  "Dictionaries.EnterValidUrl": "Введите корректный http:// или https:// URL.",
+  "Dictionaries.DownloadSuccess": "Загружено {0} слов для {1}.",
+  "Dictionaries.NetworkError": "Ошибка сети:\n{0}",
+  "Dictionaries.GenericError": "Ошибка:\n{0}",
+
+  "Menu.Autocorrect": "Автокоррекция",
+  "Menu.ConvertWord": "Конвертировать слово",
+  "Menu.Settings": "Настройки…",
+  "Menu.Exit": "Выход",
+
+  "Tray.AutocorrectOnSuffix": " (автокоррекция вкл.)",
+
+  "Balloon.CantDetermineLayout": "Не удалось определить целевую раскладку",
+  "Balloon.ClipboardBusy": "Буфер обмена занят — попробуйте ещё раз",
+  "Balloon.NoWordToConvert": "Нет слова для конвертации — сначала напечатайте слово",
+  "Balloon.WrongLayout": "Не та раскладка? → {0}{1}",
+  "Balloon.PressToFix": " (нажмите {0}, чтобы исправить)",
+  "Balloon.ErrorPrefix": "Ошибка: {0}",
+
+  "AppPicker.Title": "Выбор запущенного приложения"
+}

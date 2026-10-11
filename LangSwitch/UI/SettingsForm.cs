@@ -1,6 +1,7 @@
 using LangSwitch.Core;
 using LangSwitch.Settings;
 using System.Net.Http;
+using static LangSwitch.Core.Localization;
 
 namespace LangSwitch.UI;
 
@@ -36,6 +37,8 @@ sealed class SettingsForm : Form
     CheckBox _fixCapsLockBox = null!;
     CheckBox _autoPunctuationBox = null!;
     CheckBox _launchAtStartupBox = null!;
+    ComboBox _languageBox = null!;
+    List<(string Code, string DisplayName)> _languages = [];
     TextBox  _hotkeyBox = null!;
     NumericUpDown _clipDelayBox = null!;
     NumericUpDown _undoThresholdBox = null!;
@@ -89,7 +92,7 @@ sealed class SettingsForm : Form
 
     void Build()
     {
-        Text            = "LangSwitch — Settings";
+        Text            = T("Settings.Title");
         Size            = new Size(580, 520);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox     = false;
@@ -151,13 +154,13 @@ sealed class SettingsForm : Form
             return b;
         }
 
-        var btnGeneral      = MakeNavButton("General");
-        var btnAppearance   = MakeNavButton("Appearance");
-        var btnExclusions   = MakeNavButton("Exclusions");
-        var btnAbbreviations = MakeNavButton("Abbreviations");
-        var btnStatistics   = MakeNavButton("Statistics");
-        var btnLanguages    = MakeNavButton("Languages");
-        var btnDictionaries = MakeNavButton("Dictionaries");
+        var btnGeneral      = MakeNavButton(T("Nav.General"));
+        var btnAppearance   = MakeNavButton(T("Nav.Appearance"));
+        var btnExclusions   = MakeNavButton(T("Nav.Exclusions"));
+        var btnAbbreviations = MakeNavButton(T("Nav.Abbreviations"));
+        var btnStatistics   = MakeNavButton(T("Nav.Statistics"));
+        var btnLanguages    = MakeNavButton(T("Nav.Languages"));
+        var btnDictionaries = MakeNavButton(T("Nav.Dictionaries"));
 
         var buttons = new[] { btnGeneral, btnAppearance, btnExclusions, btnAbbreviations, btnStatistics, btnLanguages, btnDictionaries };
 
@@ -209,8 +212,8 @@ sealed class SettingsForm : Form
     Panel BuildButtonBar()
     {
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 46, Padding = new Padding(0, 9, 12, 0) };
-        var btnOk     = new Button { Text = "OK",     DialogResult = DialogResult.OK,     Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
-        var btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var btnOk     = new Button { Text = T("Common.OK"),     DialogResult = DialogResult.OK,     Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var btnCancel = new Button { Text = T("Common.Cancel"), DialogResult = DialogResult.Cancel, Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         btnOk.Click += (_, _) => ApplyAll();
         void Place()
         {
@@ -284,15 +287,25 @@ sealed class SettingsForm : Form
 
     Panel BuildGeneralSection()
     {
-        var behavior = Card("Behavior");
-        _autocorrectBox = new CheckBox { Text = "Enable autocorrect", AutoSize = true };
-        _notifyWrongLayoutBox = new CheckBox { Text = "Show balloon when a word may be in the wrong layout", AutoSize = true };
-        _fixCapsLockBox = new CheckBox { Text = "Fix accidental Caps Lock (hELLO → Hello)", AutoSize = true };
-        _autoPunctuationBox = new CheckBox { Text = "Auto-punctuation (double space → period, \" - \" → — )", AutoSize = true };
-        _launchAtStartupBox = new CheckBox { Text = "Launch LangSwitch when Windows starts", AutoSize = true };
+        var iface = Card(T("General.Interface.Title"));
+        var ifaceInner = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Font = RegularFont };
+        var lblLanguage = new Label { Text = T("General.Interface.Language"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
+        _languages = GetAvailableLanguages().ToList();
+        _languageBox = new ComboBox { Width = 160, DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(0, 3, 0, 0) };
+        foreach (var (_, displayName) in _languages) _languageBox.Items.Add(displayName);
+        ifaceInner.Controls.Add(lblLanguage, 0, 0);
+        ifaceInner.Controls.Add(_languageBox, 1, 0);
+        iface.Controls.Add(ifaceInner);
+
+        var behavior = Card(T("General.Behavior.Title"));
+        _autocorrectBox = new CheckBox { Text = T("General.Behavior.EnableAutocorrect"), AutoSize = true };
+        _notifyWrongLayoutBox = new CheckBox { Text = T("General.Behavior.NotifyWrongLayout"), AutoSize = true };
+        _fixCapsLockBox = new CheckBox { Text = T("General.Behavior.FixCapsLock"), AutoSize = true };
+        _autoPunctuationBox = new CheckBox { Text = T("General.Behavior.AutoPunctuation"), AutoSize = true };
+        _launchAtStartupBox = new CheckBox { Text = T("General.Behavior.LaunchAtStartup"), AutoSize = true };
         behavior.Controls.Add(VStack(_autocorrectBox, _notifyWrongLayoutBox, _fixCapsLockBox, _autoPunctuationBox, _launchAtStartupBox));
 
-        var hotkey = Card("Convert word hotkey");
+        var hotkey = Card(T("General.Hotkey.Title"));
         var hotkeyInner = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 1, Font = RegularFont,
@@ -301,7 +314,7 @@ sealed class SettingsForm : Form
         hotkeyInner.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         hotkeyInner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var hint = new Label { Text = "Press key:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
+        var hint = new Label { Text = T("General.Hotkey.PressKey"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
         _capturedKey = _settings.ConvertHotKey;
         _hotkeyBox = new TextBox
         {
@@ -311,7 +324,7 @@ sealed class SettingsForm : Form
             Text      = KeyLabel(_capturedKey),
             Margin    = new Padding(0, 3, 8, 0),
         };
-        _hotkeyBox.GotFocus  += (_, _) => _hotkeyBox.Text = "Press hotkey…";
+        _hotkeyBox.GotFocus  += (_, _) => _hotkeyBox.Text = T("General.Hotkey.PressHotkeyPlaceholder");
         _hotkeyBox.LostFocus += (_, _) => _hotkeyBox.Text = KeyLabel(_capturedKey);
         _hotkeyBox.KeyDown   += (_, e) =>
         {
@@ -325,7 +338,7 @@ sealed class SettingsForm : Form
             _hotkeyBox.Text    = KeyLabel(_capturedKey);
             _hotkeyBox.Parent?.Focus();
         };
-        var btnClear = new Button { Text = "Clear", Width = 56, Height = 24, Margin = new Padding(0, 1, 0, 0) };
+        var btnClear = new Button { Text = T("Common.Clear"), Width = 56, Height = 24, Margin = new Padding(0, 1, 0, 0) };
         btnClear.Click += (_, _) => { _capturedKey = Keys.None; _hotkeyBox.Text = KeyLabel(Keys.None); };
 
         hotkeyInner.Controls.Add(hint, 0, 0);
@@ -333,20 +346,20 @@ sealed class SettingsForm : Form
         hotkeyInner.Controls.Add(btnClear, 2, 0);
         hotkey.Controls.Add(hotkeyInner);
 
-        var advanced = Card("Advanced");
+        var advanced = Card(T("General.Advanced.Title"));
         var advInner = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 2, Font = RegularFont };
-        var lblDelay = new Label { Text = "Clipboard sync delay (ms):", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
+        var lblDelay = new Label { Text = T("General.Advanced.ClipboardDelay"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) };
         _clipDelayBox = new NumericUpDown { Width = 70, Minimum = 10, Maximum = 1000, Increment = 10, Margin = new Padding(0, 3, 8, 0) };
         var lblDelayHint = new Label
         {
-            Text = "20 = local · 200–400 = remote desktop (e.g. TeamViewer)",
+            Text = T("General.Advanced.ClipboardDelayHint"),
             AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0),
         };
         advInner.Controls.Add(lblDelay, 0, 0);
         advInner.Controls.Add(_clipDelayBox, 1, 0);
         advInner.Controls.Add(lblDelayHint, 2, 0);
 
-        var lblUndo = new Label { Text = "Stop correcting a word after it's undone this many times:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 10, 8, 0) };
+        var lblUndo = new Label { Text = T("General.Advanced.UndoThreshold"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 10, 8, 0) };
         _undoThresholdBox = new NumericUpDown { Width = 70, Minimum = 2, Maximum = 10, Margin = new Padding(0, 7, 8, 0) };
         _learnedWordsLabel = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left, Margin = new Padding(0, 10, 0, 0) };
         advInner.Controls.Add(lblUndo, 0, 1);
@@ -354,12 +367,12 @@ sealed class SettingsForm : Form
         advInner.Controls.Add(_learnedWordsLabel, 2, 1);
         advanced.Controls.Add(advInner);
 
-        return CardStack(behavior, hotkey, advanced);
+        return CardStack(iface, behavior, hotkey, advanced);
     }
 
     static string KeyLabel(Keys k)
     {
-        if (k == Keys.None) return "(none)";
+        if (k == Keys.None) return T("General.Hotkey.None");
         var parts = new List<string>();
         if ((k & Keys.Control) != 0) parts.Add("Ctrl");
         if ((k & Keys.Shift)   != 0) parts.Add("Shift");
@@ -375,18 +388,18 @@ sealed class SettingsForm : Form
 
     Panel BuildAppearanceSection()
     {
-        var sizeCard = Card("Flag size");
-        _sizeSmall  = new RadioButton { Text = "Small (64 px)",  AutoSize = true };
-        _sizeMedium = new RadioButton { Text = "Medium (96 px)", AutoSize = true };
-        _sizeLarge  = new RadioButton { Text = "Large (128 px)", AutoSize = true };
+        var sizeCard = Card(T("Appearance.FlagSize.Title"));
+        _sizeSmall  = new RadioButton { Text = T("Appearance.FlagSize.Small"),  AutoSize = true };
+        _sizeMedium = new RadioButton { Text = T("Appearance.FlagSize.Medium"), AutoSize = true };
+        _sizeLarge  = new RadioButton { Text = T("Appearance.FlagSize.Large"), AutoSize = true };
         sizeCard.Controls.Add(VStack(_sizeSmall, _sizeMedium, _sizeLarge));
 
-        var posCard = Card("Popup position");
+        var posCard = Card(T("Appearance.Position.Title"));
         var posTable = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Font = RegularFont };
-        _cornerTL = new RadioButton { Text = "↖  Top Left",     AutoSize = true, Margin = new Padding(0, 4, 20, 4) };
-        _cornerTR = new RadioButton { Text = "↗  Top Right",    AutoSize = true, Margin = new Padding(0, 4, 0, 4) };
-        _cornerBL = new RadioButton { Text = "↙  Bottom Left",  AutoSize = true, Margin = new Padding(0, 4, 20, 4) };
-        _cornerBR = new RadioButton { Text = "↘  Bottom Right", AutoSize = true, Margin = new Padding(0, 4, 0, 4) };
+        _cornerTL = new RadioButton { Text = T("Appearance.Position.TopLeft"),     AutoSize = true, Margin = new Padding(0, 4, 20, 4) };
+        _cornerTR = new RadioButton { Text = T("Appearance.Position.TopRight"),    AutoSize = true, Margin = new Padding(0, 4, 0, 4) };
+        _cornerBL = new RadioButton { Text = T("Appearance.Position.BottomLeft"),  AutoSize = true, Margin = new Padding(0, 4, 20, 4) };
+        _cornerBR = new RadioButton { Text = T("Appearance.Position.BottomRight"), AutoSize = true, Margin = new Padding(0, 4, 0, 4) };
         posTable.Controls.Add(_cornerTL, 0, 0);
         posTable.Controls.Add(_cornerTR, 1, 0);
         posTable.Controls.Add(_cornerBL, 0, 1);
@@ -411,7 +424,7 @@ sealed class SettingsForm : Form
 
         var hint = new Label
         {
-            Text = "LangSwitch won't autocorrect or notify while these applications are focused\n(process name, e.g. cmd.exe):",
+            Text = T("Exclusions.Hint"),
             Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true,
         };
 
@@ -420,10 +433,10 @@ sealed class SettingsForm : Form
         var addRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
         addRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         addRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _exclusionBox = new TextBox { Dock = DockStyle.Fill, PlaceholderText = "e.g. notepad.exe", Margin = new Padding(0, 1, 6, 0) };
-        var btnAddExcl  = new Button { Text = "+ Add", Width = 60, Height = 24 };
-        var btnPickExcl = new Button { Text = "Pick running app…", Width = 110, Height = 24, Margin = new Padding(6, 0, 0, 0) };
-        var btnDelExcl  = new Button { Text = "− Remove", Width = 72, Height = 24, Margin = new Padding(6, 0, 0, 0) };
+        _exclusionBox = new TextBox { Dock = DockStyle.Fill, PlaceholderText = T("Exclusions.Placeholder"), Margin = new Padding(0, 1, 6, 0) };
+        var btnAddExcl  = new Button { Text = T("Common.Add"), Width = 60, Height = 24 };
+        var btnPickExcl = new Button { Text = T("Exclusions.PickRunningApp"), Width = 110, Height = 24, Margin = new Padding(6, 0, 0, 0) };
+        var btnDelExcl  = new Button { Text = T("Common.Remove"), Width = 72, Height = 24, Margin = new Padding(6, 0, 0, 0) };
 
         void AddExclusionText(string name)
         {
@@ -487,9 +500,9 @@ sealed class SettingsForm : Form
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var label  = new Label  { Text = "Type a trigger word, it expands as you finish typing it:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 0, 0) };
-        var btnAdd = new Button { Text = "+ Add",    Width = 60, Height = 24, Margin = new Padding(4, 2, 4, 0) };
-        var btnDel = new Button { Text = "− Remove", Width = 72, Height = 24, Margin = new Padding(0, 2, 0, 0) };
+        var label  = new Label  { Text = T("Abbreviations.Hint"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 0, 0) };
+        var btnAdd = new Button { Text = T("Common.Add"),    Width = 60, Height = 24, Margin = new Padding(4, 2, 4, 0) };
+        var btnDel = new Button { Text = T("Common.Remove"), Width = 72, Height = 24, Margin = new Padding(0, 2, 0, 0) };
         toolbar.Controls.Add(label,  0, 0);
         toolbar.Controls.Add(btnAdd, 1, 0);
         toolbar.Controls.Add(btnDel, 2, 0);
@@ -516,9 +529,9 @@ sealed class SettingsForm : Form
         detail.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         detail.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var lblTrigger = new Label { Text = "Trigger:", AutoSize = true, Anchor = AnchorStyles.Left };
+        var lblTrigger = new Label { Text = T("Abbreviations.Trigger"), AutoSize = true, Anchor = AnchorStyles.Left };
         _abbrevTriggerBox = new TextBox { Dock = DockStyle.Fill, Margin = new Padding(4, 0, 0, 4) };
-        var lblExpansion = new Label { Text = "Expands to:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
+        var lblExpansion = new Label { Text = T("Abbreviations.ExpandsTo"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
         _abbrevExpansionBox = new TextBox { Dock = DockStyle.Fill, Margin = new Padding(4, 2, 0, 0) };
 
         detail.Controls.Add(lblTrigger,         0, 0);
@@ -601,7 +614,7 @@ sealed class SettingsForm : Form
 
     Panel BuildStatisticsSection()
     {
-        var card = Card("Local statistics");
+        var card = Card(T("Statistics.Title"));
         var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -614,21 +627,21 @@ sealed class SettingsForm : Form
             return (key, val);
         }
 
-        (_, _statWords)   = Row("Words corrected:");
-        (_, _statChars)   = Row("Characters fixed:");
-        (_, _statManual)  = Row("Manual conversions:");
-        (_, _statTime)    = Row("Estimated time saved:");
-        (_, _statLearned) = Row("Words excluded via undo-learning:");
+        (_, _statWords)   = Row(T("Statistics.WordsCorrected"));
+        (_, _statChars)   = Row(T("Statistics.CharactersFixed"));
+        (_, _statManual)  = Row(T("Statistics.ManualConversions"));
+        (_, _statTime)    = Row(T("Statistics.TimeSaved"));
+        (_, _statLearned) = Row(T("Statistics.LearnedWords"));
 
         var hint = new Label
         {
-            Text = "Stored locally only — nothing is sent anywhere.",
+            Text = T("Statistics.PrivacyHint"),
             AutoSize = true, ForeColor = SystemColors.GrayText, Dock = DockStyle.Top, Margin = new Padding(0, 10, 0, 10),
         };
 
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
-        var btnResetStats   = new Button { Text = "Reset statistics", Width = 110, Height = 24 };
-        var btnResetLearned = new Button { Text = "Reset learned words", Width = 130, Height = 24, Margin = new Padding(8, 0, 0, 0) };
+        var btnResetStats   = new Button { Text = T("Statistics.ResetStats"), Width = 110, Height = 24 };
+        var btnResetLearned = new Button { Text = T("Statistics.ResetLearned"), Width = 130, Height = 24, Margin = new Padding(8, 0, 0, 0) };
         btnResetStats.Click += (_, _) =>
         {
             _stats.WordsCorrected = 0;
@@ -682,11 +695,11 @@ sealed class SettingsForm : Form
 
         var searchLabel = new Label
         {
-            Text = "Keyboard layouts (check to install, uncheck to remove):",
+            Text = T("Languages.Hint"),
             Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
         };
 
-        _searchBox = new TextBox { Dock = DockStyle.Fill, PlaceholderText = "Search…" };
+        _searchBox = new TextBox { Dock = DockStyle.Fill, PlaceholderText = T("Languages.SearchPlaceholder") };
         _searchBox.TextChanged += (_, _) => FilterList(_searchBox.Text);
 
         _layoutList = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = false, IntegralHeight = false };
@@ -694,7 +707,7 @@ sealed class SettingsForm : Form
 
         var hint = new Label
         {
-            Text = "Some changes may require signing out and back in to take full effect.",
+            Text = T("Languages.SignOutHint"),
             ForeColor = SystemColors.GrayText, Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleLeft,
         };
@@ -766,9 +779,9 @@ sealed class SettingsForm : Form
 
         if (failed.Count > 0)
             MessageBox.Show(
-                "Could not remove the following layouts (they may be in use):\n\n" +
-                string.Join("\n", failed) + "\n\nTry signing out and back in.",
-                "LangSwitch", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                T("Languages.RemoveFailedPrefix") +
+                string.Join("\n", failed) + T("Languages.RemoveFailedSuffix"),
+                T("Common.AppName"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -799,9 +812,9 @@ sealed class SettingsForm : Form
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var label  = new Label  { Text = "Word list dictionaries:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 0, 0) };
-        var btnAdd = new Button { Text = "+ Add",    Width = 60, Height = 24, Margin = new Padding(4, 2, 4, 0) };
-        var btnDel = new Button { Text = "− Remove", Width = 72, Height = 24, Margin = new Padding(0, 2, 0, 0) };
+        var label  = new Label  { Text = T("Dictionaries.Hint"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 0, 0) };
+        var btnAdd = new Button { Text = T("Common.Add"),    Width = 60, Height = 24, Margin = new Padding(4, 2, 4, 0) };
+        var btnDel = new Button { Text = T("Common.Remove"), Width = 72, Height = 24, Margin = new Padding(0, 2, 0, 0) };
 
         btnAdd.Click += (_, _) => AddDictionary();
         btnDel.Click += (_, _) => RemoveDictionary();
@@ -848,14 +861,14 @@ sealed class SettingsForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var lblName = new Label { Text = "Name:", AutoSize = true, Anchor = AnchorStyles.Left };
+        var lblName = new Label { Text = T("Dictionaries.Name"), AutoSize = true, Anchor = AnchorStyles.Left };
         _dictNameBox = new TextBox { Dock = DockStyle.Fill, Margin = new Padding(4, 0, 4, 4) };
-        var lblLang  = new Label  { Text = "Lang:", AutoSize = true, Anchor = AnchorStyles.Left };
+        var lblLang  = new Label  { Text = T("Dictionaries.Lang"), AutoSize = true, Anchor = AnchorStyles.Left };
         _dictLangBox = new TextBox { Dock = DockStyle.Fill, Margin = new Padding(4, 0, 0, 4) };
 
-        var lblUrl   = new Label { Text = "URL:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
+        var lblUrl   = new Label { Text = T("Dictionaries.Url"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
         _dictUrlBox  = new TextBox { Dock = DockStyle.Fill, Margin = new Padding(4, 2, 4, 4) };
-        _dictDlBtn   = new Button  { Text = "⬇ Download", Dock = DockStyle.Fill, Height = 24, Margin = new Padding(0, 2, 0, 4) };
+        _dictDlBtn   = new Button  { Text = T("Dictionaries.Download"), Dock = DockStyle.Fill, Height = 24, Margin = new Padding(0, 2, 0, 4) };
         _dictDlBtn.Click += async (_, _) => await DownloadSelectedDict();
 
         _dictStatus = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 0, 0) };
@@ -934,13 +947,13 @@ sealed class SettingsForm : Form
     void RefreshDictStatus(UserDictionary dict)
     {
         var count = string.IsNullOrEmpty(dict.Lang) ? 0 : _langDicts.WordCount(dict.Lang);
-        _dictStatus.Text      = count > 0 ? $"{count:N0} words loaded ✓" : "Not downloaded";
+        _dictStatus.Text      = count > 0 ? string.Format(T("Dictionaries.WordsLoaded"), count.ToString("N0")) : T("Dictionaries.NotDownloaded");
         _dictStatus.ForeColor = count > 0 ? Color.SeaGreen : SystemColors.GrayText;
     }
 
     void AddDictionary()
     {
-        var dict = new UserDictionary { Name = "New Dictionary", Enabled = true };
+        var dict = new UserDictionary { Name = T("Dictionaries.NewDictionaryName"), Enabled = true };
         _dicts.Add(dict);
 
         _suppressDict = true;
@@ -973,14 +986,14 @@ sealed class SettingsForm : Form
 
         if (string.IsNullOrEmpty(lang))
         {
-            MessageBox.Show("Enter a language code (e.g. en, ru, uk).", "LangSwitch",
+            MessageBox.Show(T("Dictionaries.EnterLangCode"), T("Common.AppName"),
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            MessageBox.Show("Enter a valid http:// or https:// URL.", "LangSwitch",
+            MessageBox.Show(T("Dictionaries.EnterValidUrl"), T("Common.AppName"),
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -993,17 +1006,17 @@ sealed class SettingsForm : Form
             int count = await WordListDownloader.DownloadAsync(lang, url, progress);
             _langDicts.Reload(_dicts);
             RefreshDictStatus(dict);
-            MessageBox.Show($"Downloaded {count:N0} words for {lang.ToUpperInvariant()}.",
-                "LangSwitch", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(string.Format(T("Dictionaries.DownloadSuccess"), count.ToString("N0"), lang.ToUpperInvariant()),
+                T("Common.AppName"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (HttpRequestException ex)
         {
-            MessageBox.Show($"Network error:\n{ex.Message}", "LangSwitch",
+            MessageBox.Show(string.Format(T("Dictionaries.NetworkError"), ex.Message), T("Common.AppName"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error:\n{ex.Message}", "LangSwitch",
+            MessageBox.Show(string.Format(T("Dictionaries.GenericError"), ex.Message), T("Common.AppName"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
@@ -1043,13 +1056,17 @@ sealed class SettingsForm : Form
         _clipDelayBox.Value           = Math.Clamp(_settings.ClipboardDelayMs, 10, 1000);
         _undoThresholdBox.Value       = Math.Clamp(_settings.UndoLearnThreshold, 2, 10);
         _launchAtStartupBox.Checked   = StartupManager.IsEnabled();
+
+        int langIdx = _languages.FindIndex(l => l.Code == _settings.UiLanguage);
+        _languageBox.SelectedIndex = langIdx >= 0 ? langIdx : 0;
+
         RefreshLearnedWordsLabel();
     }
 
     void RefreshLearnedWordsLabel()
     {
         int learned = _undoCounts.Count(kv => kv.Value >= _settings.UndoLearnThreshold);
-        _learnedWordsLabel.Text = $"{learned} word(s) currently excluded this way";
+        _learnedWordsLabel.Text = string.Format(T("General.Advanced.LearnedWordsCount"), learned);
     }
 
     void SaveDisplayValues()
@@ -1070,6 +1087,9 @@ sealed class SettingsForm : Form
         _settings.AutoPunctuation   = _autoPunctuationBox.Checked;
         _settings.ClipboardDelayMs  = (int)_clipDelayBox.Value;
         _settings.UndoLearnThreshold = (int)_undoThresholdBox.Value;
+
+        if (_languageBox.SelectedIndex >= 0)
+            _settings.UiLanguage = _languages[_languageBox.SelectedIndex].Code;
 
         StartupManager.SetEnabled(_launchAtStartupBox.Checked);
     }

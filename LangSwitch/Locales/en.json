@@ -1,0 +1,106 @@
+{
+  "_displayName": "English",
+
+  "Common.OK": "OK",
+  "Common.Cancel": "Cancel",
+  "Common.Clear": "Clear",
+  "Common.Add": "+ Add",
+  "Common.Remove": "− Remove",
+  "Common.AppName": "LangSwitch",
+
+  "Settings.Title": "LangSwitch — Settings",
+
+  "Nav.General": "General",
+  "Nav.Appearance": "Appearance",
+  "Nav.Exclusions": "Exclusions",
+  "Nav.Abbreviations": "Abbreviations",
+  "Nav.Statistics": "Statistics",
+  "Nav.Languages": "Languages",
+  "Nav.Dictionaries": "Dictionaries",
+
+  "General.Interface.Title": "Interface",
+  "General.Interface.Language": "Language:",
+
+  "General.Behavior.Title": "Behavior",
+  "General.Behavior.EnableAutocorrect": "Enable autocorrect",
+  "General.Behavior.NotifyWrongLayout": "Show balloon when a word may be in the wrong layout",
+  "General.Behavior.FixCapsLock": "Fix accidental Caps Lock (hELLO → Hello)",
+  "General.Behavior.AutoPunctuation": "Auto-punctuation (double space → period, \" - \" → — )",
+  "General.Behavior.LaunchAtStartup": "Launch LangSwitch when Windows starts",
+
+  "General.Hotkey.Title": "Convert word hotkey",
+  "General.Hotkey.PressKey": "Press key:",
+  "General.Hotkey.PressHotkeyPlaceholder": "Press hotkey…",
+  "General.Hotkey.None": "(none)",
+
+  "General.Advanced.Title": "Advanced",
+  "General.Advanced.ClipboardDelay": "Clipboard sync delay (ms):",
+  "General.Advanced.ClipboardDelayHint": "20 = local · 200–400 = remote desktop (e.g. TeamViewer)",
+  "General.Advanced.UndoThreshold": "Stop correcting a word after it's undone this many times:",
+  "General.Advanced.LearnedWordsCount": "{0} word(s) currently excluded this way",
+
+  "Appearance.FlagSize.Title": "Flag size",
+  "Appearance.FlagSize.Small": "Small (64 px)",
+  "Appearance.FlagSize.Medium": "Medium (96 px)",
+  "Appearance.FlagSize.Large": "Large (128 px)",
+
+  "Appearance.Position.Title": "Popup position",
+  "Appearance.Position.TopLeft": "↖  Top Left",
+  "Appearance.Position.TopRight": "↗  Top Right",
+  "Appearance.Position.BottomLeft": "↙  Bottom Left",
+  "Appearance.Position.BottomRight": "↘  Bottom Right",
+
+  "Exclusions.Hint": "LangSwitch won't autocorrect or notify while these applications are focused\n(process name, e.g. cmd.exe):",
+  "Exclusions.Placeholder": "e.g. notepad.exe",
+  "Exclusions.PickRunningApp": "Pick running app…",
+
+  "Abbreviations.Hint": "Type a trigger word, it expands as you finish typing it:",
+  "Abbreviations.Trigger": "Trigger:",
+  "Abbreviations.ExpandsTo": "Expands to:",
+
+  "Statistics.Title": "Local statistics",
+  "Statistics.WordsCorrected": "Words corrected:",
+  "Statistics.CharactersFixed": "Characters fixed:",
+  "Statistics.ManualConversions": "Manual conversions:",
+  "Statistics.TimeSaved": "Estimated time saved:",
+  "Statistics.LearnedWords": "Words excluded via undo-learning:",
+  "Statistics.PrivacyHint": "Stored locally only — nothing is sent anywhere.",
+  "Statistics.ResetStats": "Reset statistics",
+  "Statistics.ResetLearned": "Reset learned words",
+
+  "Languages.Hint": "Keyboard layouts (check to install, uncheck to remove):",
+  "Languages.SearchPlaceholder": "Search…",
+  "Languages.SignOutHint": "Some changes may require signing out and back in to take full effect.",
+  "Languages.RemoveFailedPrefix": "Could not remove the following layouts (they may be in use):\n\n",
+  "Languages.RemoveFailedSuffix": "\n\nTry signing out and back in.",
+
+  "Dictionaries.Hint": "Word list dictionaries:",
+  "Dictionaries.Name": "Name:",
+  "Dictionaries.Lang": "Lang:",
+  "Dictionaries.Url": "URL:",
+  "Dictionaries.Download": "⬇ Download",
+  "Dictionaries.NotDownloaded": "Not downloaded",
+  "Dictionaries.WordsLoaded": "{0} words loaded ✓",
+  "Dictionaries.NewDictionaryName": "New Dictionary",
+  "Dictionaries.EnterLangCode": "Enter a language code (e.g. en, ru, uk).",
+  "Dictionaries.EnterValidUrl": "Enter a valid http:// or https:// URL.",
+  "Dictionaries.DownloadSuccess": "Downloaded {0} words for {1}.",
+  "Dictionaries.NetworkError": "Network error:\n{0}",
+  "Dictionaries.GenericError": "Error:\n{0}",
+
+  "Menu.Autocorrect": "Autocorrect",
+  "Menu.ConvertWord": "Convert word",
+  "Menu.Settings": "Settings…",
+  "Menu.Exit": "Exit",
+
+  "Tray.AutocorrectOnSuffix": " (autocorrect on)",
+
+  "Balloon.CantDetermineLayout": "Can't determine target layout",
+  "Balloon.ClipboardBusy": "Clipboard busy — try again",
+  "Balloon.NoWordToConvert": "No word to convert — type a word first",
+  "Balloon.WrongLayout": "Wrong layout? → {0}{1}",
+  "Balloon.PressToFix": " (press {0} to fix)",
+  "Balloon.ErrorPrefix": "Error: {0}",
+
+  "AppPicker.Title": "Pick a running app"
+}

@@ -1,4 +1,5 @@
 using LangSwitch.Core;
+using static LangSwitch.Core.Localization;
 
 namespace LangSwitch.UI;
 
@@ -11,7 +12,7 @@ sealed class AppPickerForm : Form
 
     public AppPickerForm()
     {
-        Text            = "Pick a running app";
+        Text            = T("AppPicker.Title");
         Size            = new Size(420, 420);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox     = false;
@@ -25,8 +26,8 @@ sealed class AppPickerForm : Form
         _list.DoubleClick += (_, _) => Accept();
 
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 46, Padding = new Padding(0, 9, 12, 0) };
-        var btnOk     = new Button { Text = "OK",     DialogResult = DialogResult.OK,     Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
-        var btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var btnOk     = new Button { Text = T("Common.OK"),     DialogResult = DialogResult.OK,     Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var btnCancel = new Button { Text = T("Common.Cancel"), DialogResult = DialogResult.Cancel, Width = 84, Height = 28, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         btnOk.Click += (_, _) => Accept();
         void Place()
         {

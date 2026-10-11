@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using LangSwitch.Autocorrect;
 using LangSwitch.Core;
 using LangSwitch.Settings;
+using static LangSwitch.Core.Localization;
 
 namespace LangSwitch.UI;
 
@@ -32,6 +34,7 @@ sealed class TrayApplicationContext : ApplicationContext
     public TrayApplicationContext()
     {
         _settings      = SettingsStore.Load();
+        ResolveUiLanguage();
         var seedLangs  = WindowsLayoutDetector.GetInstalledLayouts()
             .Select(l => l.Culture.TwoLetterISOLanguageName).Distinct();
         _dicts         = DictionaryStore.Load(seedLangs);
@@ -54,7 +57,7 @@ sealed class TrayApplicationContext : ApplicationContext
 
         _tray = new NotifyIcon
         {
-            Text = "LangSwitch",
+            Text = T("Common.AppName"),
             Visible = true,
             ContextMenuStrip = BuildMenu(),
         };
@@ -106,6 +109,20 @@ sealed class TrayApplicationContext : ApplicationContext
         _tracker.Feed(e);
     }
 
+    void ResolveUiLanguage()
+    {
+        if (string.IsNullOrEmpty(_settings.UiLanguage))
+        {
+            var systemLang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            var available = GetAvailableLanguages();
+            _settings.UiLanguage = available.Any(l => string.Equals(l.Code, systemLang, StringComparison.OrdinalIgnoreCase))
+                ? systemLang
+                : "en";
+            SettingsStore.Save(_settings);
+        }
+        Load(_settings.UiLanguage);
+    }
+
     HashSet<string> NeverCorrectSet() =>
         new(_undoCounts.Where(kv => kv.Value >= _settings.UndoLearnThreshold).Select(kv => kv.Key),
             StringComparer.OrdinalIgnoreCase);
@@ -137,7 +154,7 @@ sealed class TrayApplicationContext : ApplicationContext
             catch (Exception ex)
             {
                 AppLog.Error(ex);
-                Balloon("Error: " + ex.Message);
+                Balloon(string.Format(T("Balloon.ErrorPrefix"), ex.Message));
             }
         }, null);
     }
@@ -235,14 +252,14 @@ sealed class TrayApplicationContext : ApplicationContext
         if (converted == clipped)
         {
             await ClipSetAsync(prevClip);
-            Balloon("Can't determine target layout");
+            Balloon(T("Balloon.CantDetermineLayout"));
             return true;
         }
 
         if (!await ClipSetAndVerifyAsync(converted))
         {
             await ClipSetAsync(prevClip);
-            Balloon("Clipboard busy — try again");
+            Balloon(T("Balloon.ClipboardBusy"));
             return true;
         }
         await Task.Delay(_settings.ClipboardDelayMs);
@@ -262,7 +279,7 @@ sealed class TrayApplicationContext : ApplicationContext
         if (!string.IsNullOrEmpty(buf))
         {
             var converted = _candidates.ConvertToOppositeLayout(buf, _langDicts);
-            if (converted == buf) { Balloon("Can't determine target layout"); return; }
+            if (converted == buf) { Balloon(T("Balloon.CantDetermineLayout")); return; }
 
             _tracker.Set(converted);
             await ReplaceViaClipboardAsync(buf.Length, converted);
@@ -270,7 +287,7 @@ sealed class TrayApplicationContext : ApplicationContext
         else if (!string.IsNullOrEmpty(lastWord))
         {
             var converted = _candidates.ConvertToOppositeLayout(lastWord, _langDicts);
-            if (converted == lastWord) { Balloon("Can't determine target layout"); return; }
+            if (converted == lastWord) { Balloon(T("Balloon.CantDetermineLayout")); return; }
 
             int deleteCount = lastWord.Length + (lastBound != '\0' ? 1 : 0);
             string insert   = converted + (lastBound != '\0' ? lastBound.ToString() : "");
@@ -278,7 +295,7 @@ sealed class TrayApplicationContext : ApplicationContext
         }
         else
         {
-            Balloon("No word to convert — type a word first");
+            Balloon(T("Balloon.NoWordToConvert"));
         }
     }
 
@@ -290,7 +307,7 @@ sealed class TrayApplicationContext : ApplicationContext
         // write failure never leaves the word erased with nothing to paste back in its place.
         if (!await ClipSetAndVerifyAsync(insert))
         {
-            Balloon("Clipboard busy — try again");
+            Balloon(T("Balloon.ClipboardBusy"));
             return;
         }
 
@@ -327,9 +344,9 @@ sealed class TrayApplicationContext : ApplicationContext
             if (corrected is not null)
             {
                 var hotKey = _settings.ConvertHotKey != Keys.None
-                    ? $" (press {HotKeyLabel(_settings.ConvertHotKey)} to fix)"
+                    ? string.Format(T("Balloon.PressToFix"), HotKeyLabel(_settings.ConvertHotKey))
                     : "";
-                Balloon($"Wrong layout? → {corrected}{hotKey}");
+                Balloon(string.Format(T("Balloon.WrongLayout"), corrected, hotKey));
             }
         }
     }
@@ -344,11 +361,11 @@ sealed class TrayApplicationContext : ApplicationContext
     }
 
     void Balloon(string msg) =>
-        _tray.ShowBalloonTip(2000, "LangSwitch", msg, ToolTipIcon.Info);
+        _tray.ShowBalloonTip(2000, T("Common.AppName"), msg, ToolTipIcon.Info);
 
     ContextMenuStrip BuildMenu()
     {
-        _autocorrectItem = new ToolStripMenuItem("Autocorrect")
+        _autocorrectItem = new ToolStripMenuItem(T("Menu.Autocorrect"))
         {
             CheckOnClick = true,
             Checked      = _settings.AutocorrectEnabled,
@@ -363,11 +380,11 @@ sealed class TrayApplicationContext : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add(_autocorrectItem);
         var hotKeyLabel = _settings.ConvertHotKey == Keys.None ? "" : $" ({HotKeyLabel(_settings.ConvertHotKey)})";
-        menu.Items.Add($"Convert word{hotKeyLabel}", null, (_, _) => ScheduleConvert());
+        menu.Items.Add($"{T("Menu.ConvertWord")}{hotKeyLabel}", null, (_, _) => ScheduleConvert());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Settings…", null, (_, _) => OpenSettings());
+        menu.Items.Add(T("Menu.Settings"), null, (_, _) => OpenSettings());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => Quit());
+        menu.Items.Add(T("Menu.Exit"), null, (_, _) => Quit());
         menu.Opening += (_, _) => MenuTheme.Apply(menu);
         return menu;
     }
@@ -432,14 +449,15 @@ sealed class TrayApplicationContext : ApplicationContext
 
         var icon = TrayIconFactory.Create(layout, _settings.AutocorrectEnabled);
         _tray.Icon = icon;
-        _tray.Text = $"LangSwitch — {layout.DisplayName}"
-            + (_settings.AutocorrectEnabled ? " (autocorrect on)" : "");
+        _tray.Text = $"{T("Common.AppName")} — {layout.DisplayName}"
+            + (_settings.AutocorrectEnabled ? T("Tray.AutocorrectOnSuffix") : "");
         _currentIcon?.Dispose();
         _currentIcon = icon;
     }
 
     void OpenSettings()
     {
+        var langBefore = _settings.UiLanguage;
         using var form = new SettingsForm(_settings, _dicts, _langDicts, _abbreviations, _stats, _undoCounts, ResetUndoLearning);
         if (form.ShowDialog() == DialogResult.OK)
         {
@@ -453,6 +471,13 @@ sealed class TrayApplicationContext : ApplicationContext
             _engine.SetFixCapsLock(_settings.FixCapsLock);
             _engine.ReloadNeverCorrect(NeverCorrectSet());
             _popup.ApplySettings(_settings);
+
+            if (_settings.UiLanguage != langBefore)
+            {
+                Load(_settings.UiLanguage);
+                _tray.ContextMenuStrip = BuildMenu();
+            }
+
             RefreshTrayIcon(_monitor.Current);
             _autocorrectItem.Checked = _settings.AutocorrectEnabled;
         }

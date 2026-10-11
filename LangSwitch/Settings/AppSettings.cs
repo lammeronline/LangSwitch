@@ -10,6 +10,9 @@ public class AppSettings
     public bool            FixCapsLock         { get; set; } = true;
     public bool            AutoPunctuation     { get; set; } = false;
     public int             UndoLearnThreshold  { get; set; } = 3;
+    /// <summary>Empty means "not resolved yet" — TrayApplicationContext picks a default from
+    /// the system locale on first run and persists it.</summary>
+    public string          UiLanguage          { get; set; } = "";
     public Keys            ConvertHotKey       { get; set; } = Keys.None;
     public int             ClipboardDelayMs    { get; set; } = 20;
 
