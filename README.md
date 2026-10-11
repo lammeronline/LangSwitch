@@ -69,6 +69,11 @@ files next to the executable at runtime (`settings.json`,
 `dictionaries.json`, `abbreviations.json`, `WordLists/`), not in the
 repository.
 
+## Contributing a translation
+
+The UI is localized via plain JSON files under `LangSwitch/Locales/` — no
+code changes needed to add a language. See [LOCALIZATION.md](LOCALIZATION.md).
+
 ## License
 
 [MIT](LICENSE)
