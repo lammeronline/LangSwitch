@@ -80,7 +80,7 @@ public sealed class LanguageDictionaries
     }
 
     static string Normalize(string w) =>
-        new(w.Trim().ToLowerInvariant().Where(char.IsLetter).ToArray());
+        new(w.Trim().ToLowerInvariant().Where(TextNormalization.IsWordChar).ToArray());
 
     // ── Fallback word lists (loaded even without downloaded files, en/ru/uk only) ──
     // Note: Fallbacks must be declared after the arrays it references — static field

@@ -45,7 +45,7 @@ public static class WordListDownloader
             var trimmed = line.Trim();
             if (trimmed.Length == 0) continue;
             var word = trimmed.Split(' ', 2)[0];
-            if (word.Length > 0 && word.All(char.IsLetter))
+            if (word.Length > 0 && word.All(TextNormalization.IsWordChar))
                 result.Add(word.ToLowerInvariant());
         }
         return result;
