@@ -1,0 +1,58 @@
+name: Release
+
+# Triggered from the CLI by pushing a version tag:
+#   git tag v1.0.1
+#   git push origin v1.0.1
+# Can also be run manually from the Actions tab (workflow_dispatch) against any ref — in that
+# case the build is published but no GitHub Release is created, since a release needs a real
+# tag to attach to.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore LangSwitch.sln
+
+      - name: Test
+        run: dotnet test LangSwitch.Tests/LangSwitch.Tests.csproj --configuration Release --no-restore
+
+      - name: Publish (single-file, self-contained win-x64)
+        run: >
+          dotnet publish LangSwitch/LangSwitch.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none
+          -o build/out
+
+      - name: Zip the publish output
+        shell: pwsh
+        run: Compress-Archive -Path build/out/* -DestinationPath "LangSwitch-${{ github.ref_name }}-win-x64.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LangSwitch-win-x64
+          path: LangSwitch-${{ github.ref_name }}-win-x64.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release create "${{ github.ref_name }}"
+          "LangSwitch-${{ github.ref_name }}-win-x64.zip"
+          --title "LangSwitch ${{ github.ref_name }}"
+          --generate-notes
