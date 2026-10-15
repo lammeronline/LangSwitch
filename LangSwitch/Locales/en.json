@@ -75,6 +75,7 @@
   "Statistics.ManualConversions": "Manual conversions:",
   "Statistics.TimeSaved": "Estimated time saved:",
   "Statistics.LearnedWords": "Words excluded via undo-learning:",
+  "Statistics.LearnedWordsList.Title": "Excluded words",
   "Statistics.PrivacyHint": "Stored locally only — nothing is sent anywhere.",
   "Statistics.ResetStats": "Reset statistics",
   "Statistics.ResetLearned": "Reset learned words",

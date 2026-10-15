@@ -697,6 +697,7 @@ sealed class SettingsForm : Form
     // ═══════════════════════════════════════════════════════════════════════
 
     Label _statWords = null!, _statChars = null!, _statManual = null!, _statTime = null!, _statLearned = null!;
+    ListBox _learnedWordsList = null!;
 
     Panel BuildStatisticsSection()
     {
@@ -750,8 +751,58 @@ sealed class SettingsForm : Form
         inner.Controls.Add(buttons);
         card.Controls.Add(inner);
 
+        var learnedCard = BuildLearnedWordsListCard();
+
+        btnResetLearned.Click += (_, _) => RefreshLearnedWordsList();
+
         RefreshStats();
-        return CardStack(card);
+        RefreshLearnedWordsList();
+        return CardStack(card, learnedCard);
+    }
+
+    /// <summary>
+    /// Lists every word the undo-learning threshold has excluded from autocorrect (not just
+    /// the count), each individually removable — "Reset" above clears all of them at once,
+    /// this is for undoing the exclusion of one specific word. Edits mutate the shared
+    /// _undoCounts dictionary directly (the same instance TrayApplicationContext holds), so
+    /// they take effect the normal way through the existing OK → ReloadNeverCorrect flow.
+    /// </summary>
+    GroupBox BuildLearnedWordsListCard()
+    {
+        var card = Card(T("Statistics.LearnedWordsList.Title"));
+        var outer = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
+        outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 120));
+        outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        _learnedWordsList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+
+        var btnRemoveWord = MakeButton(T("Common.Remove"));
+        btnRemoveWord.Margin = new Padding(0, 6, 0, 0);
+        btnRemoveWord.Click += (_, _) =>
+        {
+            if (_learnedWordsList.SelectedItem is not string word) return;
+            _undoCounts.Remove(word);
+            RefreshLearnedWordsList();
+            RefreshStats();
+            RefreshLearnedWordsLabel();
+        };
+
+        outer.Controls.Add(_learnedWordsList, 0, 0);
+        outer.Controls.Add(btnRemoveWord,      0, 1);
+        card.Controls.Add(outer);
+        return card;
+    }
+
+    void RefreshLearnedWordsList()
+    {
+        var learned = _undoCounts
+            .Where(kv => kv.Value >= _settings.UndoLearnThreshold)
+            .Select(kv => kv.Key)
+            .OrderBy(w => w, StringComparer.OrdinalIgnoreCase);
+
+        _learnedWordsList.Items.Clear();
+        foreach (var word in learned) _learnedWordsList.Items.Add(word);
     }
 
     void RefreshStats()

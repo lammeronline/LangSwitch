@@ -75,6 +75,7 @@
   "Statistics.ManualConversions": "Ручних конвертацій:",
   "Statistics.TimeSaved": "Приблизно заощаджено часу:",
   "Statistics.LearnedWords": "Слів виключено через навчання на undo:",
+  "Statistics.LearnedWordsList.Title": "Виключені слова",
   "Statistics.PrivacyHint": "Зберігається лише локально — нікуди не надсилається.",
   "Statistics.ResetStats": "Скинути статистику",
   "Statistics.ResetLearned": "Скинути вивчені слова",

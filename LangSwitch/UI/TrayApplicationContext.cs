@@ -176,7 +176,12 @@ sealed class TrayApplicationContext : ApplicationContext
             return;
         }
 
-        if (_settings.AutoPunctuation && !IsExcludedApp() && _punctuator.TryHandle(e))
+        // Auto-punctuation is a form of automatic text modification just like layout
+        // autocorrect, so the master "Autocorrect" toggle pauses it too — otherwise turning
+        // that toggle off (the obvious "stop touching my text" action) would silently leave
+        // dashes/periods still being rewritten, which reads as autocorrect not actually
+        // being off.
+        if (_settings.AutocorrectEnabled && _settings.AutoPunctuation && !IsExcludedApp() && _punctuator.TryHandle(e))
             return;
 
         if (e.Key == Keys.Back && _pendingUndo is { } undo)
