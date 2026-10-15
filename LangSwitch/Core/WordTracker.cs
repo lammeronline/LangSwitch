@@ -13,6 +13,8 @@ sealed class WordTracker
     [DllImport("user32.dll")] static extern uint   GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] static extern IntPtr GetKeyboardLayout(uint tid);
     [DllImport("user32.dll")] static extern bool   GetKeyboardState(byte[] state);
+    [DllImport("user32.dll")] static extern short  GetAsyncKeyState(int vKey);
+    [DllImport("user32.dll")] static extern short  GetKeyState(int vKey);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     static extern int ToUnicodeEx(uint vk, uint scan, byte[] state,
         [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder buf, int bufLen, uint flags, IntPtr hkl);
@@ -39,8 +41,18 @@ sealed class WordTracker
                 return;
         }
 
+        // GetKeyboardState reflects the state as of the calling thread's last retrieved
+        // message, not the true hardware state at this instant — inside a WH_KEYBOARD_LL
+        // hook (which fires ahead of normal message dispatch), that can lag behind a modifier
+        // keydown that happened a few milliseconds ago, misreading e.g. Shift+1 as plain "1".
+        // Patch the modifier bits from GetAsyncKeyState (true real-time hardware state) so
+        // ToUnicodeEx sees the shift/ctrl/alt state that's actually held right now.
         var keyState = new byte[256];
         GetKeyboardState(keyState);
+        PatchAsync(keyState, Keys.ShiftKey); PatchAsync(keyState, Keys.LShiftKey); PatchAsync(keyState, Keys.RShiftKey);
+        PatchAsync(keyState, Keys.ControlKey); PatchAsync(keyState, Keys.LControlKey); PatchAsync(keyState, Keys.RControlKey);
+        PatchAsync(keyState, Keys.Menu); PatchAsync(keyState, Keys.LMenu); PatchAsync(keyState, Keys.RMenu);
+        keyState[(int)Keys.CapsLock] = (byte)(GetKeyState((int)Keys.CapsLock) & 1);
 
         // Ctrl+anything resets the word (copy, paste, undo, etc.) — but AltGr (used to type
         // @/€/other symbols on many non-US layouts) is reported by Windows as a synthetic
@@ -68,6 +80,9 @@ sealed class WordTracker
             WordReady?.Invoke(this, new WordReadyEventArgs(word, ch, e));
         }
     }
+
+    static void PatchAsync(byte[] keyState, Keys key) =>
+        keyState[(int)key] = (byte)((GetAsyncKeyState((int)key) & 0x8000) != 0 ? 0x80 : 0);
 
     public void Clear() => _buf.Clear();
 

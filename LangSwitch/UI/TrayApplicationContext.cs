@@ -43,6 +43,14 @@ sealed class TrayApplicationContext : ApplicationContext
 
     string _lastWord     = string.Empty;
     char   _lastBoundary = '\0';
+
+    // The text typed on the current line so far (word+boundary, accumulated across
+    // OnWordReady, reset on Enter) — used only to recognize an accidental "copy current
+    // line, no real selection" Ctrl+C (see TryConvertSelectionAsync). _lastWord alone only
+    // ever holds a single word, so a line-copy of a multi-word line ("Привет Андрей!")
+    // never matched it and was wrongly treated as a genuine multi-word selection, pasting
+    // the converted line back on top of — not in place of — the original.
+    string _currentLine = string.Empty;
     PendingUndo? _pendingUndo;
 
     // The most recent foreground window that belongs to some other app — i.e. whatever the
@@ -151,13 +159,26 @@ sealed class TrayApplicationContext : ApplicationContext
         // instead of whatever app the user was really working in.
         var fg = LayoutManager.CurrentForegroundWindow;
         if (fg != IntPtr.Zero && !LayoutManager.BelongsToCurrentProcess(fg))
+        {
+            // The word/line buffers describe what's been typed in one specific window. Without
+            // this reset, switching focus to a different window (e.g. a different editor tab
+            // or app) mid-buffer leaves stale text in _currentLine, which can then fail to
+            // match a fresh Ctrl+C line-copy in the new window and get misread as a real
+            // selection (see TryConvertSelectionAsync).
+            if (fg != _lastExternalWindow)
+            {
+                _tracker.Clear();
+                _currentLine = string.Empty;
+            }
             _lastExternalWindow = fg;
+        }
 
         // Never buffer, autocorrect, or manually convert text in a password field.
         if (PasswordFieldDetector.IsFocusedFieldPassword())
         {
             _pendingUndo = null;
             _tracker.Clear();
+            _currentLine = string.Empty;
             return;
         }
 
@@ -192,6 +213,7 @@ sealed class TrayApplicationContext : ApplicationContext
             string restore   = undo.Original + (undo.Boundary != '\0' ? undo.Boundary.ToString() : "");
             TextInjector.Replace(deleteCount, restore);
             _tracker.Clear();
+            _currentLine = string.Empty;
             RecordUndo(undo.Original);
             return;
         }
@@ -331,9 +353,15 @@ sealed class TrayApplicationContext : ApplicationContext
         // get that newline silently dropped on paste-back.
         var trimmedForComparison = clipped.Trim();
 
-        // Если скопированный текст совпадает с текущим или последним завершённым
-        // словом — это line-copy без реального выделения, а не выделение пользователя.
-        if (trimmedForComparison == trackerBuf || trimmedForComparison == lastWord)
+        // Если скопированный текст совпадает с текущим/последним словом ИЛИ с тем, что
+        // набрано на текущей строке целиком, — это line-copy без реального выделения
+        // (поведение многих редакторов при Ctrl+C без выделения), а не выделение
+        // пользователя. Сравнение только с одним словом (trackerBuf/lastWord) не ловит
+        // многословную строку — "Привет Андрей!" целиком никогда не равно последнему
+        // слову "Андрей", поэтому такой line-copy проходил как настоящее выделение и
+        // конвертированный текст вставлялся ПОВЕРХ оригинала, а не вместо него.
+        if (trimmedForComparison == trackerBuf || trimmedForComparison == lastWord ||
+            (_currentLine.Length > 0 && trimmedForComparison == _currentLine.Trim()))
         {
             await ClipSetAsync(prevClip);
             return false;
@@ -360,6 +388,7 @@ sealed class TrayApplicationContext : ApplicationContext
         await ClipSetAsync(prevClip);
 
         _tracker.Clear();
+        _currentLine = string.Empty;
         _stats.ManualConversions++;
         return true;
     }
@@ -425,6 +454,9 @@ sealed class TrayApplicationContext : ApplicationContext
     {
         _lastWord     = e.Word;
         _lastBoundary = e.Boundary;
+
+        _currentLine += e.Word + e.Boundary;
+        if (e.Boundary is '\r' or '\n') _currentLine = string.Empty;
 
         if (IsExcludedApp()) return;
 
