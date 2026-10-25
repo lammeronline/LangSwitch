@@ -7,6 +7,7 @@
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using LangSwitch.Core;
 
 namespace AutoTest;
 
@@ -14,9 +15,29 @@ static class Program
 {
     const string NppPath = @"C:\Program Files\Notepad++\notepad++.exe";
 
+    static void DictCheck(string[] words)
+    {
+        var dicts = new LanguageDictionaries(new[]
+        {
+            new UserDictionary { Lang = "ru", Enabled = true },
+            new UserDictionary { Lang = "en", Enabled = true },
+            new UserDictionary { Lang = "uk", Enabled = true },
+        });
+        foreach (var w in words)
+        {
+            Console.WriteLine($"'{w}': ru={dicts.Contains("ru", w)} en={dicts.Contains("en", w)} uk={dicts.Contains("uk", w)} ContainsAny={dicts.ContainsAny(w)} source(ru)={dicts.SourceOf("ru")}");
+        }
+    }
+
     [STAThread]
     static void Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--dict-check")
+        {
+            DictCheck(args.Skip(1).ToArray());
+            return;
+        }
+
         string typed    = args.Length > 0 ? args[0] : "Ghbdtn Fylhtq!";
         string expected = args.Length > 1 ? args[1] : "";
 

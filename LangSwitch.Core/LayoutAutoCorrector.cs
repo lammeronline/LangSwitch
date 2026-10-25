@@ -8,7 +8,10 @@ public static class LayoutAutoCorrector
     /// </summary>
     public static string? TryCorrect(string word, IEnumerable<(string Word, string Lang)> candidatesSource, LanguageDictionaries dicts)
     {
-        if (word.Length < 2) return null;
+        // 2-letter words collide too often with a real short word in another layout (e.g.
+        // "yf" <-> "на") — the resulting "wrong layout?" suggestions read as noise more than
+        // help, so require at least 3 characters before offering one.
+        if (word.Length < 3) return null;
 
         var candidates = candidatesSource.ToList();
         if (candidates.Count == 0) return null;
